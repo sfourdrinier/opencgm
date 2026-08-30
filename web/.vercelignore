@@ -1,0 +1,6 @@
+# Uploaded by `vercel` when run from this directory. node_modules is 1.3 GB and is
+# reinstalled by the build anyway; .next is rebuilt.
+node_modules
+.next
+.vercel
+.env*.local

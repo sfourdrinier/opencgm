@@ -1,0 +1,11 @@
+# The deployable site is web/. Running `vercel` from the repository root sweeps up the
+# research tree with it -- artifacts/ is 18 GB of checkpoints, runs*/ another 3.6 GB, and
+# data/raw is a symlink onto an 11 GB dataset volume. That is the 21 GB upload.
+#
+# Deploy from web/, or better, let the Git integration build from GitHub, which holds 8 MB.
+
+*
+!web/
+web/node_modules
+web/.next
+web/.vercel

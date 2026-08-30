@@ -53,3 +53,5 @@ CLAUDE.md
 runs_3090.txt
 # working logs, superseded by paper.md and findings/
 reports/
+.vercel
+.env*
