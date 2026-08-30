@@ -16,13 +16,27 @@ is no `package.json`.
     npx vercel           # preview deployment, a throwaway URL
     npx vercel --prod    # production
 
-## Why `vercel.json` looks the way it does
+## Function limits: set them in the route, not in `vercel.json`
 
-**Function memory and duration.** `/api/v1/analyse` loads a 1.9 MB ONNX graph into
-onnxruntime-node and runs inference. The default 1024 MB is tight and the default 10 s
-timeout is enough only on a warm function; a cold start that has to initialise the runtime can
-exceed it. 1769 MB is the memory tier that also raises the CPU allocation, which is what
-actually makes the inference quick.
+`vercel.json`'s `functions` key matches the legacy `api/` directory convention. Pointing it at
+an App Router path fails the build with:
+
+    The pattern "app/api/v1/analyse/route.ts" defined in `functions`
+    doesn't match any Serverless Functions inside the `api` directory.
+
+For the App Router, per-route limits are segment exports in the route file itself.
+`app/api/v1/analyse/route.ts` already carries them:
+
+    export const runtime = "nodejs";   // onnxruntime-node needs Node, not Edge
+    export const maxDuration = 30;     // a cold start initialising the ONNX runtime
+                                       // can exceed the 10 s default
+
+**Memory is a project setting, not a file one.** Project → Settings → Functions → Function
+CPU. The analyse route loads a 1.9 MB ONNX graph and runs inference; the default allocation
+works but a higher tier also raises CPU, which is what actually makes it quick. Raise it only
+if the endpoint feels slow — the browser demo does not touch it.
+
+## Why `vercel.json` still exists
 
 **Immutable caching for `/models/` and `/ort/`.** The encoder is 1.9 MB and the ONNX Runtime
 WASM is another 14 MB. They are content-stable for the life of a deployment, and without this

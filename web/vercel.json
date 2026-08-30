@@ -1,11 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "app/api/v1/analyse/route.ts": {
-      "memory": 1769,
-      "maxDuration": 30
-    }
-  },
   "headers": [
     {
       "source": "/models/(.*)",
