@@ -53,10 +53,10 @@ export default function Home() {
             Try it on a sample day
           </Link>
           <Link
-            href="/api"
+            href="/paper"
             className="border border-rule-strong px-5 py-2.5 text-sm font-medium text-ink hover:border-accent hover:text-accent"
           >
-            Use the API
+            Read the paper
           </Link>
           <p className="mt-1 w-full text-sm text-ink-soft">
             No file needed — sample days are built in. Or drop in your own Dexcom or Libre
