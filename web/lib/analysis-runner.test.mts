@@ -4,9 +4,8 @@ import { buildWindow } from "./csv/grid";
 import { buildAnalysis, type LiveDay } from "./analysis";
 import { runReadingsAnalysis, type AnalysisRunnerDependencies } from "./analysis-runner";
 import type { ExampleAnalysis } from "./example";
-import type { HeadsBundle, Reading, Window } from "./types";
+import type { HeadsBundle, Reading } from "./types";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const STEP_MS = 5 * 60 * 1000;
 
 function localMidnight(year: number, month: number, day: number): number {
