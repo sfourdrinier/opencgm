@@ -1,11 +1,15 @@
-# The deployable site is web/. Running `vercel` from the repository root sweeps up the
-# research tree with it -- artifacts/ is 18 GB of checkpoints, runs*/ another 3.6 GB, and
-# data/raw is a symlink onto an 11 GB dataset volume. That is the 21 GB upload.
+# The deployable site is web/. Deploying from the repository root without this uploads the
+# research tree: artifacts/ is 18 GB of checkpoints, runs*/ another 3.6 GB, and data/raw is a
+# symlink onto an 11 GB dataset volume.
 #
-# Deploy from web/, or better, let the Git integration build from GitHub, which holds 8 MB.
-
-*
-!web/
+# The leading slash matters. A bare `*` matches at every depth, so it excludes the contents
+# of web/ as well as its siblings, and the build then fails with
+#   The specified Root Directory "web" does not exist.
+# `/*` matches only top-level entries, which is what leaves web/ intact.
+/*
+!/web
+# /paper renders this at build time; it is the source the page must not drift from.
+!/paper.md
 web/node_modules
 web/.next
 web/.vercel

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { marked } from "marked";
 import { LINKS } from "@/lib/facts";
@@ -11,7 +11,23 @@ export const metadata = {
 
 /** Rendered from the repository's paper.md, so the page cannot drift from the source. */
 function paperHtml(): { html: string; toc: { depth: number; text: string; id: string }[] } {
-  const md = readFileSync(join(process.cwd(), "..", "paper.md"), "utf8");
+  // paper.md lives at the repository root while this app is in web/, so the path depends on
+  // where the build runs from. Locally that is web/; on a platform that treats web/ as the
+  // project root it can be either. Try the layouts rather than assume one -- the build
+  // failed on Vercel with ENOENT for exactly this reason.
+  const candidates = [
+    join(process.cwd(), "..", "paper.md"),
+    join(process.cwd(), "paper.md"),
+    join(process.cwd(), "content", "paper.md"),
+  ];
+  const found = candidates.find((c) => existsSync(c));
+  if (!found) {
+    throw new Error(
+      `paper.md not found. Looked in:\n  ${candidates.join("\n  ")}\n` +
+        "It is at the repository root; make sure the deployment uploads it.",
+    );
+  }
+  const md = readFileSync(found, "utf8");
 
   const toc: { depth: number; text: string; id: string }[] = [];
   const slug = (s: string) =>
