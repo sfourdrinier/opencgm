@@ -5,13 +5,15 @@
   "description": "Next.js demo for the OpenCGM-StateEvent encoder. Apache-2.0.",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "tsx scripts/verify-sensor-artifact.ts",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "postinstall": "tsx scripts/copy-ort-assets.ts",
     "test": "tsx --test lib/*.test.mts lib/**/*.test.mts components/*.test.mts",
-    "test:focused": "tsx --test"
+    "test:focused": "tsx --test",
+    "verify:sensor-artifact": "tsx scripts/verify-sensor-artifact.ts"
   },
   "dependencies": {
     "marked": "^18.0.11",
@@ -32,8 +34,8 @@
     "@types/papaparse": "^5.3.14",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "eslint": "^9.10.0",
-    "eslint-config-next": "^16.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3",
     "postcss": "^8.4.47",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.20.0",
