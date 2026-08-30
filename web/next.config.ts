@@ -29,7 +29,30 @@ const config: NextConfig = {
   // this the functions deploy without their model and fail with ENOENT on the first call --
   // while the static pages, which read the same files at build time, look perfectly fine.
   outputFileTracingIncludes: {
-    "/api/v1/**": ["./public/models/**"],
+    "/api/v1/**": [
+      "./public/models/**",
+      // onnxruntime_binding.node is traced because it is required; the shared library it
+      // dlopens beside itself is not, because nothing imports it. Without this the function
+      // deploys with the binding and no runtime behind it, and fails on the first call.
+      "node_modules/onnxruntime-node/bin/napi-v*/linux/x64/libonnxruntime.so*",
+    ],
+  },
+
+  // onnxruntime-node ships prebuilt binaries for every platform it supports -- 503 MB of
+  // them -- and the tracer packs the lot, which puts the function over Vercel's 500 MB
+  // limit on its own. A Linux x64 serverless function needs exactly one of these files.
+  // The CUDA provider alone is 219 MB and there is no GPU to use it.
+  outputFileTracingExcludes: {
+    "/api/v1/**": [
+      "node_modules/onnxruntime-node/bin/napi-v*/win32/**",
+      "node_modules/onnxruntime-node/bin/napi-v*/darwin/**",
+      "node_modules/onnxruntime-node/bin/napi-v*/linux/arm64/**",
+      "node_modules/onnxruntime-node/bin/napi-v*/**/libonnxruntime_providers_cuda.so",
+      "node_modules/onnxruntime-node/bin/napi-v*/**/libonnxruntime_providers_tensorrt.so",
+      // Browser build. The demo loads it from the client bundle; a server function never
+      // imports it, but it is 137 MB if it slips in.
+      "node_modules/onnxruntime-web/**",
+    ],
   },
 
   async headers() {

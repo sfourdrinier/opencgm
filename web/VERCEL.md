@@ -42,6 +42,25 @@ if the endpoint feels slow — the browser demo does not touch it.
 WASM is another 14 MB. They are content-stable for the life of a deployment, and without this
 header a returning visitor re-downloads them.
 
+## Bundle size
+
+The first deploy fails with:
+
+    Error: Total bundle size (624.06 MB) exceeds the maximum function size (500 MB).
+
+That is onnxruntime-node, which ships prebuilt binaries for every platform it supports --
+503 MB of them -- and the tracer packs all of it. A Linux x64 serverless function needs two
+files out of that set. The CUDA provider alone is 219 MB and there is no GPU to use it.
+
+`next.config.ts` excludes win32, darwin, linux/arm64 and the CUDA and TensorRT providers,
+which brings the function to 53 MB.
+
+One subtlety worth knowing, because the symptom is silent: the tracer follows the `require`
+of `onnxruntime_binding.node` but not the `dlopen` of `libonnxruntime.so.1` sitting beside
+it. Exclude too aggressively, or forget to include that library explicitly, and the function
+ships a binding with no runtime behind it -- deploying cleanly and failing on the first call.
+`outputFileTracingIncludes` names it for that reason.
+
 ## The failure mode to check first
 
 The API routes read `public/models/*` from disk at request time. Serverless bundlers trace
