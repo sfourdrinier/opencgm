@@ -6,13 +6,15 @@ import { DayChart } from "@/components/DayChart";
 import { ExampleAnalysisView } from "@/components/ExampleAnalysis";
 import { buildWindow, coverageOf } from "@/lib/csv/grid";
 import { parseCgmCsv } from "@/lib/csv/parse";
-import { type LiveDay, buildAnalysis } from "@/lib/analysis";
+import {
+  MAX_DAYS,
+  MIN_COVERAGE,
+  runReadingsAnalysis,
+  selectAnalysisDays,
+} from "@/lib/analysis-runner";
 import type { ExampleAnalysis } from "@/lib/example";
-import { loadHeadsBundle } from "@/lib/model/heads";
-import { decompose, embedBatch } from "@/lib/model/loadOnnx";
-import { type Reference, loadReference } from "@/lib/model/rank";
 import { PROFILES, buildSampleDay } from "@/lib/sample/days";
-import type { HeadsBundle, Reading, Window } from "@/lib/types";
+import type { Reading, Window } from "@/lib/types";
 
 // The demo used to give a thinner analysis than the worked example: one day, a probe table,
 // and a separate similarity panel. It now builds the same object /example is generated into
@@ -20,44 +22,9 @@ import type { HeadsBundle, Reading, Window } from "@/lib/types";
 // example promised them -- every day, the decomposition, the rankings, the refusals.
 
 const SAMPLE_DAY_START = Date.UTC(2026, 0, 15, 0, 0, 0);
-const STEP_MS = 5 * 60 * 1000;
-const N = 288;
 
 /** Days a classifier could plausibly score. Below this the analysis is mostly gaps. */
-const MIN_COVERAGE = 0.25;
-
-/**
- * How many days to analyse from one file.
- *
- * The streams model runs once per day, in WASM, so a 90-day export would mean ninety
- * sequential inferences and a page that appears to hang. Two weeks is enough to see whether
- * weekdays differ from weekends, which is the question multiple days are useful for, and
- * completes in a few seconds. The most recent days are kept: someone looking at their own
- * data is usually asking about now.
- */
-const MAX_DAYS = 14;
-
 type Status = "idle" | "loading-model" | "running" | "done" | "error";
-
-/** Local-midnight starts for every day an upload covers, oldest first. */
-function availableDays(readings: Reading[]): number[] {
-  const starts = new Set<number>();
-  for (const r of readings) {
-    const d = new Date(r.t);
-    d.setHours(0, 0, 0, 0);
-    starts.add(d.getTime());
-  }
-  return [...starts].sort((a, b) => a - b);
-}
-
-function coverageAt(readings: Reading[], startT: number): number {
-  const seen = new Set<number>();
-  for (const r of readings) {
-    const idx = Math.floor((r.t - startT) / STEP_MS);
-    if (idx >= 0 && idx < N) seen.add(idx);
-  }
-  return seen.size / N;
-}
 
 /** Everything the run produced, as one file, for taking into a notebook. */
 function downloadAnalysis(analysis: ExampleAnalysis) {
@@ -84,8 +51,6 @@ export function TryClient() {
   /** Scoreable days beyond MAX_DAYS that were left out, so the page can say so. */
   const [trimmed, setTrimmed] = useState(0);
 
-  const bundleRef = useRef<HeadsBundle | null>(null);
-  const referenceRef = useRef<Reference | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // A simulated day so the page is useful with no interaction and no file.
@@ -101,9 +66,8 @@ export function TryClient() {
 
   const usable = useMemo(() => {
     if (!readings) return [];
-    const scoreable = dayStarts.filter((s) => coverageAt(readings, s) >= MIN_COVERAGE);
-    return scoreable.slice(-MAX_DAYS);
-  }, [readings, dayStarts]);
+    return selectAnalysisDays(readings).usableDayStarts;
+  }, [readings]);
 
   // The first usable day, drawn before anything runs so the reader sees what will be read.
   const preview: Window | null = useMemo(
@@ -112,40 +76,18 @@ export function TryClient() {
   );
 
   const run = useCallback(
-    async (rs: Reading[], starts: number[]) => {
+    async (rs: Reading[]) => {
       setError(null);
       setAnalysis(null);
       setStatus("loading-model");
       const t0 = performance.now();
       try {
-        if (!bundleRef.current) bundleRef.current = await loadHeadsBundle();
-        if (!referenceRef.current) referenceRef.current = await loadReference();
-
-        setStatus("running");
-        const windows = starts.map((s) => buildWindow(rs, s));
-
-        setProgress(`Encoding ${windows.length} day${windows.length === 1 ? "" : "s"}…`);
-        const embeddings = await embedBatch(windows);
-
-        // The streams come from a second graph, fetched once and then run per day.
-        const streams: (Awaited<ReturnType<typeof decompose>> | null)[] = [];
-        for (let i = 0; i < windows.length; i += 1) {
-          setProgress(`Splitting day ${i + 1} of ${windows.length}…`);
-          try {
-            streams.push(await decompose(windows[i]!));
-          } catch {
-            streams.push(null);
-          }
-        }
-
-        const live: LiveDay[] = windows.map((w, i) => ({
-          window: w,
-          embedding: embeddings[i]!,
-          streams: streams[i] ?? null,
-          startT: starts[i]!,
-        }));
-
-        setAnalysis(buildAnalysis(live, bundleRef.current, referenceRef.current));
+        const result = await runReadingsAnalysis(rs, (message) => {
+          if (message.startsWith("Loading model")) return;
+          setProgress(message);
+          if (message.startsWith("Encoding")) setStatus("running");
+        });
+        setAnalysis(result.analysis);
         setElapsedMs(performance.now() - t0);
         setStatus("done");
       } catch (e) {
@@ -169,24 +111,23 @@ export function TryClient() {
           setError("No usable rows. The file needs a time column and a glucose column.");
           return;
         }
-        const starts = availableDays(parsed.readings);
-        const scoreable = starts.filter((s) => coverageAt(parsed.readings, s) >= MIN_COVERAGE);
-        const keep = scoreable.slice(-MAX_DAYS);
+        const selection = selectAnalysisDays(parsed.readings);
+        const { allDayStarts, usableDayStarts, trimmedDayCount } = selection;
         setReadings(parsed.readings);
-        setDayStarts(starts);
-        setTrimmed(scoreable.length - keep.length);
+        setDayStarts([...allDayStarts]);
+        setTrimmed(trimmedDayCount);
         setSourceLabel(
-          `${file.name} — ${parsed.readings.length.toLocaleString()} readings over ${starts.length} day${starts.length === 1 ? "" : "s"}`,
+          `${file.name} — ${parsed.readings.length.toLocaleString()} readings over ${allDayStarts.length} day${allDayStarts.length === 1 ? "" : "s"}`,
         );
-        if (keep.length === 0) {
+        if (usableDayStarts.length === 0) {
           setError(
-            `None of the ${starts.length} days in this file has at least ${MIN_COVERAGE * 100}% of its readings.`,
+            `None of the ${allDayStarts.length} days in this file has at least ${MIN_COVERAGE * 100}% of its readings.`,
           );
           return;
         }
         // Run immediately, over everything. Making someone press a second button to see the
         // thing they came for is friction with nothing on the other side of it.
-        void run(parsed.readings, keep);
+        void run(parsed.readings);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -300,7 +241,7 @@ export function TryClient() {
 
           <button
             type="button"
-            onClick={() => readings && void run(readings, usable)}
+            onClick={() => readings && void run(readings)}
             disabled={busy}
             className="mt-5 bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-ink disabled:opacity-60"
           >

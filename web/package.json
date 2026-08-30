@@ -10,7 +10,8 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "postinstall": "tsx scripts/copy-ort-assets.ts",
-    "test": "tsx lib/csv/parse.test.mts"
+    "test": "tsx --test lib/*.test.mts lib/**/*.test.mts components/*.test.mts",
+    "test:focused": "tsx --test"
   },
   "dependencies": {
     "marked": "^18.0.11",
