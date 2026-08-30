@@ -1,3 +1,5 @@
+<!-- web/VERCEL.md -->
+
 # Deploying the site
 
 The Next.js app is in `web/`, not at the repository root. Everything below follows from that.
@@ -87,3 +89,49 @@ traffic, move the bucket to a KV store or put a WAF in front. It is a speed bump
 ## Environment
 
 Nothing is required. `NEXT_DEV_ORIGINS` is development-only and should not be set in Vercel.
+
+## Browser sensor import
+
+The experimental importer is available by direct URL at
+<https://opencgm.vercel.app/sensor-import>. It is intentionally not linked from
+navigation, the home page, the try page, or the sitemap while hardware proof is
+being completed. For local development, use
+`http://localhost:3000/sensor-import` (or the port printed by Next).
+
+The production URL is a secure context. The localhost HTTP exception is only for
+development; other HTTP origins must not be documented as supported. The
+connect action must begin from the user's button click, and browser capability
+detection—not a user-agent string—decides whether Web Bluetooth is available.
+The current support copy shown before connecting is exactly: “Requires Google
+Chrome, Bluetooth, and a Dexcom G7 sensor.” Keep origin and secure-context
+details here and in tests rather than expanding the primary UI copy.
+
+The page connects directly through Web Bluetooth, runs the opaque engine and
+analysis in the browser, and never sends sensor readings, credentials, or
+exports to a server. It has no background connection. Static first-party assets
+still have to be downloaded to render the page; that is not a sensor-data upload.
+The route has no relay, proxy, or private-origin exception.
+
+The only browser engine module is
+`/sensor/sensor-engine.abi1.wasm`, accompanied by its manifest. The loader
+verifies the manifest digest before instantiation. Keep the stable WASM filename
+on `Cache-Control: public, max-age=0, must-revalidate`; artifact updates must be
+revalidated rather than treated as immutable. `web/vercel.json` and
+`next.config.ts` carry the corresponding header and same-origin CSP policy.
+Before a deploy, run:
+
+```bash
+cd web
+pnpm run verify:sensor-artifact
+pnpm run test:focused -- lib/sensor/artifact.test.mts
+pnpm run type-check
+pnpm run build
+```
+
+If the chooser shows no sensor, another application may have the sensor's radio
+session or the sensor may be out of range/asleep; stop the competing session,
+bring the sensor nearby, and retry. A cancelled chooser, denied permission,
+missing pairing material, or link loss is surfaced as a local retryable state.
+The importer only returns history the sensor makes available. It can therefore
+complete with partial history and warnings; a partial import is not evidence
+that the unavailable interval contained no readings.

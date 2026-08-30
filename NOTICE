@@ -1,3 +1,5 @@
+<!-- NOTICE -->
+
 OpenCGM-StateEvent
 Copyright 2026 Stephane Fourdrinier
 
@@ -20,6 +22,7 @@ This repository contains two distinct artefacts under two distinct licenses:
 | Fitted phenotype heads | `artifacts/glucofm_heads.json` | **CC-BY-NC-SA-4.0** — share-alike inherited from CGMacros; see `LICENSE-HEADS` and `DECISIONS.md` D025 |
 | Encoder, copied so the web demo and API can serve it | `web/public/models/encoder.onnx` | **CC-BY-NC-4.0** — see `LICENSE-WEIGHTS` |
 | Published probe heads | `web/public/models/heads.json` | **CC-BY-NC-SA-4.0** — see `LICENSE-HEADS` |
+| Browser sensor engine release artifact | `web/public/sensor/sensor-engine.abi1.wasm` and its manifest | **Apache-2.0 for this repository's distribution, with embedded dependency notices below** |
 
 The two licenses are independent. A commercial entity may use the code under Apache-2.0
 without using the weights. The weights are research / non-commercial only; a commercial
@@ -40,3 +43,46 @@ encoder. See `bundle/BLUEPRINT_AMENDMENTS.md` A4 and `DECISIONS.md` D002.
 This software is for research use. It is not a medical device and must not be used for
 diagnosis, treatment, or dosing decisions. The original paper describes GlucoFM as a
 research prototype.
+
+## Browser sensor engine provenance and notices
+
+The browser sensor page is an experimental, direct-to-device feature. Its
+release artifact is intentionally a stripped opaque WebAssembly binary; this
+public repository does not publish the engine's protocol source, private
+vectors, device traces, credentials, certificate material, source maps, or
+private source locations. WebAssembly raises reverse-engineering cost but is
+not a secrecy boundary.
+
+The engine's behavioral reference provenance is [MIT-licensed
+LoopKit/G7SensorKit](https://github.com/LoopKit/G7SensorKit) and
+[LoopKit/CGMBLEKit](https://github.com/LoopKit/CGMBLEKit). The implementation is
+an independent reimplementation; those projects' names do not imply affiliation,
+endorsement, or clinical validation. No GPL-licensed xDrip source is included in
+this repository or in the binary.
+
+The production WASM dependency graph is locked in the build that produced the
+artifact. Direct runtime dependencies are `aes` 0.8.4, `p256` 0.13.2, `sha2`
+0.10.9, and `zeroize` 1.9.0, each available under MIT and/or Apache-2.0. The
+binary also contains the following transitive runtime crates under their
+permissive notices: `base16ct`, `block-buffer`, `cfg-if`, `cipher`, `const-oid`,
+`cpufeatures`, `crypto-bigint`, `crypto-common`, `der`, `digest`, `ecdsa`,
+`elliptic-curve`, `ff`, `group`, `hmac`, `inout`, `primeorder`, `rand_core`,
+`rfc6979`, `sec1`, `signature`, `typenum`, and `version_check` (plus
+`zeroize`'s support crates) under MIT OR Apache-2.0 or the equivalent ordering
+used by each
+upstream package). `generic-array` is MIT; `subtle` is BSD-3-Clause. Build-only
+macro crates in the lock graph are not embedded in the WASM bytes. The
+artifact's manifest records the build receipt and high-level license family;
+the upstream package metadata is the source of the exact notice terms.
+
+The importer performs Bluetooth reads, history normalization, analysis, and
+CSV/NDJSON exports locally in the browser. Nothing from the connected sensor is
+uploaded. An optional remembered credential is encrypted with WebCrypto before
+local IndexedDB persistence when available; remembering it is off by default,
+and the page offers a forget action. Browser memory, developer tools, extensions,
+crash reporting, or a malicious script running on the same origin can still
+expose local data, so this feature is not a security boundary.
+
+The importer does not monitor in the background, does not guarantee complete
+history, and is not medical advice or a medical device. Do not use its output
+for diagnosis, treatment, or dosing decisions.
