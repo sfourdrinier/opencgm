@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
+
+# onnxruntime-web WASM binaries, 80 MB, copied here by the postinstall hook
+# (scripts/copy-ort-assets.ts) on every `npm install`. Committing them inflated the
+# repository to 323 MB for files that regenerate themselves.
+public/ort/

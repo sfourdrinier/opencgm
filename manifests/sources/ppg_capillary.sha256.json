@@ -1,0 +1,29 @@
+{
+  "dataset_id": "ppg_capillary",
+  "lane": "D",
+  "source_version": "zenodo_21978226",
+  "license": "CC0-1.0",
+  "n_files": 3,
+  "total_bytes": 6179717,
+  "files": [
+    {
+      "relative_path": "qc_channels.csv",
+      "content_role": "cgm",
+      "bytes": 245033,
+      "sha256": "9c07d2cf58275257c6bc75b0afb42eb463a207a889c1c109fee242b6294cd024"
+    },
+    {
+      "relative_path": "qc_records.csv",
+      "content_role": "cgm",
+      "bytes": 26792,
+      "sha256": "c99bec757968f692ff23fcd53a44926686d3c3da2428ea3bb55ea391fbdfd0d1"
+    },
+    {
+      "relative_path": "stuba_ppg_bgl_dataset.zip",
+      "content_role": "sidecar",
+      "bytes": 5907892,
+      "sha256": "6dde49ce143d3cd05983f461dcc4f5f02548b20ebfe28aff49b4c17e14c3a82c"
+    }
+  ],
+  "skipped_large": []
+}

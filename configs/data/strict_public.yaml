@@ -1,0 +1,43 @@
+# Strict public reproduction lane — the four GlucoFM pretraining cohorts.
+# Ambiguous options carry an evidence tag; the loader refuses them otherwise (§2).
+lane: strict_public
+registry: manifests/sources/registry.yaml
+
+datasets: [big_ideas, shanghai_t2dm, stanford, colas]
+
+expected_totals:
+  records_or_entries: 285
+  hours: 33736
+
+alignment:
+  window_hours: {value: 24, evidence_status: PAPER_EXACT}
+  grid_minutes: {value: 5, evidence_status: PAPER_EXACT}
+  sequence_length: {value: 288, evidence_status: PAPER_EXACT}
+  patches: {value: 24, evidence_status: PAPER_EXACT}
+  steps_per_patch: {value: 12, evidence_status: PAPER_EXACT}
+  interpolation: {value: none, evidence_status: PAPER_EXACT}
+  missing_fill_value: 0.0
+  collision_reducer: mean
+  binning:
+    default: nearest
+    tie_rule: half_away_from_zero
+    per_dataset:
+      big_ideas: nearest
+      shanghai_t2dm: nearest   # provably identical to floor: readings land on the minute
+      stanford: nearest
+      colas: nearest
+      hall: nearest
+    evidence_status: INFERRED_RECONSTRUCTION
+    decision: DECISIONS.md#D004
+    evidence: reports/binning_audit.md
+    unresolved: >-
+      Paper states floor for most datasets and nearest for some, without a mapping. Our
+      measurement finds nearest never worse and decisively better on the 5-minute Dexcom
+      sources (floor costs BIG IDEAs 1.70% of readings and a systematic 4.5-minute phase
+      error). Floor retained as Tier-2 ablation T2.1. Authors' question §27 #4.
+
+segmentation:
+  long_gap_boundary_minutes:
+    value: 60
+    comparison: strictly_greater_than
+    evidence_status: PAPER_EXACT

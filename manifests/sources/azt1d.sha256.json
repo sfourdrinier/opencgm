@@ -1,0 +1,17 @@
+{
+  "dataset_id": "azt1d",
+  "lane": "C",
+  "source_version": "mendeley_v1",
+  "license": "CC-BY-4.0",
+  "n_files": 1,
+  "total_bytes": 776131685,
+  "files": [
+    {
+      "relative_path": "AZT1D_2025.zip",
+      "content_role": "sidecar",
+      "bytes": 776131685,
+      "sha256": "2c6b4183fdc729c708c1b3230ab1988d2c9006dd35729537f2de07f649f0d113"
+    }
+  ],
+  "skipped_large": []
+}

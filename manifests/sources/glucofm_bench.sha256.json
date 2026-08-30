@@ -1,0 +1,6 @@
+{
+  "dataset_id": "glucofm_bench",
+  "lane": "E",
+  "files": [],
+  "skipped": "lane:E (eval-only, no manifest)"
+}

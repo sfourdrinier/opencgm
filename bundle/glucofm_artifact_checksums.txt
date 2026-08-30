@@ -1,0 +1,15 @@
+2fba3b14c858dd609a46f4c2df0178f0f6e40c3de020868f649ab303475394aa  glucofm_public_reproduction_blueprint.md
+cb8c6617bc490d275eb2cbc27505f15a401bf0b8b83263dc25601b2a2c32f8be  glucofm_reference_config.yaml
+6497865201ee303c18e95b8d5e357df5ffd93dd9a4bb08dd948515cd7cadb8aa  glucofm_dataset_manifest_template.yaml
+
+# The blueprint published here differs from the copy this work was planned against in one
+# respect: references to an unreleased downstream application were replaced with neutral
+# wording ("a local application"). No requirement, parameter, protocol, acceptance criterion
+# or evidence tag was changed, so nothing the reproduction is measured against moved.
+#
+#   as planned against: abf979b0df6a192ce3478c72d80dcd8d74e81536e97d5cda9c321622d3993117
+#   as published here:  2fba3b14c858dd609a46f4c2df0178f0f6e40c3de020868f649ab303475394aa
+#
+# The point of pinning this file is to show the specification was fixed before the results
+# were known and not adjusted to fit them. Recording both hashes keeps that check intact
+# rather than quietly replacing the number.

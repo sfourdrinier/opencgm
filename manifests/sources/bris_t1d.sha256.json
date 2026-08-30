@@ -1,0 +1,23 @@
+{
+  "dataset_id": "bris_t1d",
+  "lane": "C",
+  "source_version": "data_bris_33z5jc8fa6tob21ptrugzqog08",
+  "license": "CC-BY-4.0",
+  "n_files": 2,
+  "total_bytes": 26368859,
+  "files": [
+    {
+      "relative_path": "bris_t1d_open.zip",
+      "content_role": "sidecar",
+      "bytes": 26367841,
+      "sha256": "75f97e67c929f433b6c1902b31326b5c1f742191006cefb4d510ff904b8bae03"
+    },
+    {
+      "relative_path": "demographic_data.csv",
+      "content_role": "cgm",
+      "bytes": 1018,
+      "sha256": "0cf6908eacdb3fd304de7433df1a3be4f394687983041e4b719253e2fab45906"
+    }
+  ],
+  "skipped_large": []
+}

@@ -1,0 +1,59 @@
+{
+  "dataset_id": "hall",
+  "lane": "B",
+  "source_version": "plos_s010_s017",
+  "license": "CC-BY-4.0",
+  "n_files": 8,
+  "total_bytes": 7445348,
+  "files": [
+    {
+      "relative_path": "S1_cgm_timeseries.tsv",
+      "content_role": "cgm",
+      "bytes": 5671057,
+      "sha256": "9a3c85efe9bceb8ac666ae2e585aecea2057aebb81018004040f7dd514683d26"
+    },
+    {
+      "relative_path": "S2_clustering_metrics.tsv",
+      "content_role": "sidecar",
+      "bytes": 42503,
+      "sha256": "b58a23e3de0543d13b12fb9a77c2eac91cee0ed3d341150d1fbf61ee63ce8106"
+    },
+    {
+      "relative_path": "S3_glucotype_per_window.tsv",
+      "content_role": "sidecar",
+      "bytes": 605558,
+      "sha256": "7f92042345c1d444fb27c64f0825a88063f62fb93cd7dc7583542d57ca42a2cf"
+    },
+    {
+      "relative_path": "S4_silhouette_width.tsv",
+      "content_role": "sidecar",
+      "bytes": 751616,
+      "sha256": "d2d41ed2c3f73d381014ea474d72f9feeb4c099d8d5dbc9cf14149672c45b6c5"
+    },
+    {
+      "relative_path": "S5_database.sqlite",
+      "content_role": "sidecar",
+      "bytes": 27648,
+      "sha256": "fa1a43cc870bc4bc98f6af47b5e59e1168d77ec9664a3187cad2b9e623911ad6"
+    },
+    {
+      "relative_path": "S6_standardized_meal_cgm.tsv",
+      "content_role": "cgm",
+      "bytes": 232402,
+      "sha256": "fc2173e903216dd119652284a5ee0b196fd365f7796432fe67c85993592096c9"
+    },
+    {
+      "relative_path": "S7_meal_glucotype.tsv",
+      "content_role": "sidecar",
+      "bytes": 13833,
+      "sha256": "f10de665accb5211e48c6edce7c8af8dd49c621da36e92c48e23c05027b230af"
+    },
+    {
+      "relative_path": "S8_ogtt_parameters.tsv",
+      "content_role": "sidecar",
+      "bytes": 100731,
+      "sha256": "082470c6d9c3a7add37169b85dd1fbed34a4bdedd0e314d0780d8661a63df168"
+    }
+  ],
+  "skipped_large": []
+}

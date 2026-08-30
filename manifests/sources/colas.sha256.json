@@ -1,0 +1,23 @@
+{
+  "dataset_id": "colas",
+  "lane": "A",
+  "source_version": "plos_s001",
+  "license": "CC-BY-4.0",
+  "n_files": 2,
+  "total_bytes": 691815,
+  "files": [
+    {
+      "relative_path": "S1_supporting.zip",
+      "content_role": "sidecar",
+      "bytes": 688340,
+      "sha256": "4a40842cfc44473e54f05ece12b970f4c85e41e7ec11df0b1b943ac84eb2611b"
+    },
+    {
+      "relative_path": "S2_supporting.bin",
+      "content_role": "sidecar",
+      "bytes": 3475,
+      "sha256": "bcd8aca8f6bee8b520ae2c72e9ba522729c4e8c0818299434b9b87d43f4e3863"
+    }
+  ],
+  "skipped_large": []
+}

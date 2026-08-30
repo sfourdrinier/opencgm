@@ -1,0 +1,55 @@
+data/raw
+data/canonical
+data/windows
+data/reports
+runs/
+runs_5090/
+runs_buggy_teacher/
+artifacts/
+logs/
+logs_5090/
+exports/
+reports/eval/
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.env
+bundle/paper/*.pdf
+bundle/paper/*.html
+
+# OS / editor scratch
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local toy / one-off scripts (not part of the public release)
+scripts/_scratch/
+
+# Third-party paper text/HTML/PDF. Kept locally for reference; not redistributed.
+# Kept outside the repository; see RELEASE.md.
+bundle/paper/*.txt
+dist/
+
+# Working files, addressed to whoever is doing the work rather than to a reader.
+# All still on disk; simply not part of the public repository.
+# The uncompressed window manifest: 64 MB, and it compresses to 1 MB. The .gz is tracked;
+# every consumer reads either form (see manifests/windows/README.md).
+manifests/windows/*.json
+
+# (git has no trailing comments on a pattern line -- each needs its own line)
+# session resume notes
+STATE.md
+# internal objectives and key results
+GOAL.md
+# the maintainer's release checklist
+RELEASE.md
+# working rules for the coding agent
+CLAUDE.md
+# GPU-share command list
+runs_3090.txt
+# working logs, superseded by paper.md and findings/
+reports/

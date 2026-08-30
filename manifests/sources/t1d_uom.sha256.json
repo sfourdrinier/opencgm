@@ -1,0 +1,17 @@
+{
+  "dataset_id": "t1d_uom",
+  "lane": "C",
+  "source_version": "zenodo_15806142",
+  "license": "CC-BY-4.0",
+  "n_files": 1,
+  "total_bytes": 6546383,
+  "files": [
+    {
+      "relative_path": "ManchesterCSCoordinatedDiabetesStudy-V1.0.3.zip",
+      "content_role": "sidecar",
+      "bytes": 6546383,
+      "sha256": "ceb8f69025e44a21ad93f7ef559735e27c6d4acd14f88b3edfbc2519e33a41ca"
+    }
+  ],
+  "skipped_large": []
+}

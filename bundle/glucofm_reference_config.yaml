@@ -1,0 +1,466 @@
+# OpenCGM-StateEvent reference configuration
+# Independent public-data reconstruction of GlucoFM v2.
+# Every ambiguous option is explicitly tagged rather than presented as a paper fact.
+
+project:
+  name: opencgm-stateevent
+  model_family: OpenCGM-StateEvent
+  blueprint_version: "1.0"
+  evidence_cutoff: "2026-08-27"
+  paper:
+    title: "GlucoFM: A Dual-Stream Foundation Model for Continuous Glucose Monitoring"
+    arxiv_id: "2605.30865v2"
+    url: "https://arxiv.org/abs/2605.30865v2"
+  claim: >-
+    Independent high-fidelity public-data reconstruction. Not an official Google
+    implementation or checkpoint; Wear-CGM and several low-level choices are unavailable.
+
+runtime:
+  python: ">=3.11,<3.13"
+  framework: pytorch
+  precision_by_device:
+    rtx_3090: fp16
+    rtx_5090: bf16
+    h100: bf16
+  deterministic_headline_run: true
+  torch_compile: false
+  tf32: false
+
+data:
+  lane: strict_public
+  sources:
+    - dataset_id: shanghai_t2dm
+      role: pretrain
+      expected_records_or_entries: 44
+      expected_hours: 12414
+      native_cadence_minutes: 15
+      public: true
+    - dataset_id: stanford
+      role: pretrain
+      expected_records_or_entries: 19
+      expected_hours: 8761
+      native_cadence_minutes: 5
+      public: true
+    - dataset_id: big_ideas
+      role: pretrain
+      source_version: "1.1.2"
+      expected_records_or_entries: 16
+      expected_hours: 3017
+      native_cadence_minutes: 5
+      public: true
+    - dataset_id: colas
+      role: pretrain
+      expected_records_or_entries: 206
+      expected_hours: 9544
+      native_cadence_minutes: 5
+      public: true
+  excluded_nonpublic:
+    - dataset_id: wear_cgm
+      expected_records_or_entries: 192
+      expected_hours: 75330
+      reason: non_public
+  strict_expected_total:
+    records_or_entries: 285
+    hours: 33736
+  public_plus_candidates:
+    - dataset_id: physio_cgm
+      role: cgm_plus_paired_wearable
+      participants: 10
+      license: CC0
+      strict_reproduction: false
+    - dataset_id: metabonet_public
+      role: t1d_cgm_insulin_expansion
+      strict_reproduction: false
+      constituent_rights_audit_required: true
+    - dataset_id: glucofm_bench_original_sources
+      role: source_discovery_and_forecasting_eval
+      strict_reproduction: false
+      use_original_sources_not_interpolated_aggregate: true
+  unit:
+    canonical: mg/dL
+    mmol_l_to_mg_dl: 18.0182
+  identity:
+    preserve_source_subject: true
+    preserve_biological_person_when_known: true
+    preserve_session: true
+    duplicate_fingerprint_audit: true
+
+segmentation:
+  long_gap_boundary_minutes:
+    value: 60
+    comparison: strictly_greater_than
+    evidence_status: PAPER_EXACT
+
+alignment:
+  window_hours:
+    value: 24
+    evidence_status: PAPER_EXACT
+  grid_minutes:
+    value: 5
+    evidence_status: PAPER_EXACT
+  sequence_length:
+    value: 288
+    evidence_status: PAPER_EXACT
+  patches:
+    value: 24
+    evidence_status: PAPER_EXACT
+  steps_per_patch:
+    value: 12
+    evidence_status: PAPER_EXACT
+  interpolation:
+    value: none
+    evidence_status: PAPER_EXACT
+  missing_fill_value: 0.0
+  collision_reducer: mean
+  binning:
+    default: floor
+    per_dataset: {}
+    evidence_status: INFERRED_RECONSTRUCTION
+    unresolved: >-
+      Paper states floor for most datasets and nearest-index rounding for sources
+      whose timestamps are better matched by it, but does not identify the mapping.
+  circadian:
+    start_index: "floor((60*hour(t1)+minute(t1))/5)"
+    absolute_index: "(start_index+j)%288"
+    evidence_status: PAPER_EXACT
+
+window_sampling:
+  pretrain:
+    overlapping: true
+    fixed_manifest: true
+    coverage_ratio:
+      min: 0.20
+      max: 0.80
+      evidence_status: PAPER_EXACT
+    interpretation:
+      value: legal_start_fraction
+      alternatives:
+        - union_timeline_coverage
+      evidence_status: INFERRED_RECONSTRUCTION
+    start_resolution_minutes: 5
+    global_seed: 17
+  downstream:
+    overlapping: false
+    group_by_subject: true
+    evidence_status: PAPER_EXACT
+
+normalization:
+  type: observed_instance_norm
+  axes: per_sample_full_window
+  affine: false
+  epsilon: 1.0e-6
+  minimum_scale: 1.0e-4
+  branch_specific_statistics: true
+  evidence_status: INFERRED_RECONSTRUCTION
+
+gaussian_filter:
+  causal: true
+  one_sided: true
+  sigma_min:
+    value: 2.0
+    evidence_status: PAPER_EXACT
+  sigma_max:
+    value: 12.0
+    evidence_status: PAPER_EXACT
+  sigma_initial:
+    value: 6.0
+    evidence_status: PAPER_EXACT
+  radius:
+    value: 36
+    formula: "ceil(3*sigma_max)"
+    evidence_status: PAPER_EXACT
+  rho_initial: -0.4054651081081643
+  epsilon: 1.0e-6
+  compute_dtype: float32
+
+statistics:
+  rate_of_change:
+    nearest_previous_observed_max_steps:
+      value: 9
+      evidence_status: PAPER_EXACT
+    divide_by_grid_steps: true
+  intra_patch_difference:
+    value: adjacent_state_difference
+    alternatives:
+      - adjacent_raw_difference
+      - first_to_last_state_slope
+    evidence_status: INFERRED_RECONSTRUCTION
+
+model:
+  state_stream:
+    waveform_features:
+      value: 64
+      evidence_status: PAPER_EXACT
+    difference_features:
+      value: 16
+      evidence_status: PAPER_EXACT
+    statistics_features:
+      value: 48
+      evidence_status: PAPER_EXACT
+    token_dim:
+      value: 64
+      evidence_status: PAPER_EXACT
+  event_stream:
+    residual_features:
+      value: 48
+      evidence_status: PAPER_EXACT
+    roc_features:
+      value: 48
+      evidence_status: PAPER_EXACT
+    statistics_features:
+      value: 32
+      evidence_status: PAPER_EXACT
+    token_dim:
+      value: 64
+      evidence_status: PAPER_EXACT
+  stream_embedder:
+    conv_kernel_size: 3
+    conv_padding: 1
+    activation: gelu
+    masked_pooling: mean
+    final_norm: layer_norm
+    convolution_missingness_mode: zero_input_masked_mean
+    evidence_status: INFERRED_RECONSTRUCTION
+  fusion:
+    input_dim: 128
+    output_dim:
+      value: 128
+      evidence_status: PAPER_EXACT
+    final_norm: layer_norm
+  time_embedding:
+    circular_features:
+      value: "[sin(2*pi*a/288), cos(2*pi*a/288)]"
+      evidence_status: PAPER_EXACT
+    representative_patch_time: start
+    projected_dim:
+      value: 128
+      evidence_status: PAPER_EXACT
+    position_embedding: learned
+    gate:
+      type: per_dimension_sigmoid
+      init_raw: 0.0
+      combine: "position + sigmoid(gate)*circadian"
+      evidence_status: INFERRED_RECONSTRUCTION
+  context_encoder:
+    layers:
+      value: 3
+      evidence_status: PAPER_EXACT
+    hidden_dim:
+      value: 128
+      evidence_status: PAPER_EXACT
+    heads:
+      value: 4
+      evidence_status: PAPER_EXACT
+    feedforward_dim:
+      value: 256
+      evidence_status: PAPER_EXACT
+    norm_first: true
+    activation: gelu
+    dropout: 0.1
+    evidence_status_for_internals: INFERRED_RECONSTRUCTION
+  target_encoder:
+    update: ema
+    copy_scope: full_online_encoder
+    evidence_status_for_copy_scope: INFERRED_RECONSTRUCTION
+  predictor:
+    type: transformer
+    layers:
+      value: 1
+      evidence_status: PAPER_EXACT
+    hidden_dim: 128
+    heads: 4
+    feedforward_dim: 256
+    norm_first: true
+    activation: gelu
+    dropout: 0.1
+    evidence_status_for_internals: INFERRED_RECONSTRUCTION
+  transition_heads:
+    state:
+      input_dim: 256
+      hidden_dim: 256
+      output_dim: 64
+    event:
+      input_dim: 256
+      hidden_dim: 256
+      output_dim: 64
+    activation: gelu
+    residual_prediction: true
+    evidence_status_for_hidden_layout: INFERRED_RECONSTRUCTION
+  parameter_targets:
+    trainable_rounded_millions:
+      value: 0.72
+      evidence_status: PAPER_EXACT
+    total_pretraining_rounded_millions:
+      value: 1.18
+      evidence_status: PAPER_EXACT
+
+masking:
+  ratio_distribution:
+    type: uniform
+    min:
+      value: 0.50
+      evidence_status: PAPER_EXACT
+    max:
+      value: 0.60
+      evidence_status: PAPER_EXACT
+  integer_rule:
+    value: round
+    evidence_status: INFERRED_RECONSTRUCTION
+  hide_before_normalization_and_filtering:
+    value: true
+    evidence_status: PAPER_EXACT
+  masked_token_keeps_time_position:
+    value: true
+    evidence_status: INFERRED_RECONSTRUCTION
+
+ema:
+  initial_momentum:
+    value: 0.997
+    evidence_status: PAPER_EXACT
+  final_momentum:
+    value: 1.0
+    evidence_status: PAPER_EXACT
+  schedule:
+    value: cosine
+    evidence_status: PAPER_EXACT
+  update_after_optimizer_step: true
+
+loss:
+  contextual:
+    type: smooth_l1
+    beta: 1.0
+    density_weighted: true
+    masked_patches_only: true
+    weight:
+      value: 1.0
+      evidence_status: PAPER_EXACT
+  temporal:
+    type: smooth_l1
+    beta: 1.0
+    state_event_average: true
+    transition_weight: "(1-context_mask_i)*density_i*density_i_plus_1"
+    target_is_pre_transformer: true
+    weight:
+      value: 1.0
+      evidence_status: PAPER_EXACT
+  evidence_status_for_beta: INFERRED_RECONSTRUCTION
+
+augmentations:
+  shared_physical_view_between_branches:
+    value: true
+    alternatives:
+      - online_only
+      - independent_views
+    evidence_status: INFERRED_RECONSTRUCTION
+  random_order:
+    value: true
+    evidence_status: PAPER_EXACT
+  subsequent_probability_multiplier:
+    value: 0.25
+    evidence_status: PAPER_EXACT
+  baseline_wander:
+    probability: 0.25
+    amplitude_mg_dl: [5.0, 15.0]
+    cycles_per_window: [0.5, 2.0]
+    phase_radians: [0.0, 6.283185307179586]
+    evidence_status_for_phase: INFERRED_RECONSTRUCTION
+  compression_drop:
+    probability: 0.10
+    length_steps: [6, 12]
+    minimum_multiplier: [0.4, 0.7]
+    shape: v
+  decimation:
+    probability: 0.40
+    minimum_observed_exclusive: 200
+    offset_choices: [0, 1, 2]
+    retain_modulus: 3
+  disconnection:
+    probability: 0.05
+    block_count: [1, 3]
+    block_length_steps: [2, 12]
+    overlapping_blocks_allowed: true
+    evidence_status_for_overlap: INFERRED_RECONSTRUCTION
+
+training:
+  profile: paper_minimal
+  epochs:
+    value: 120
+    evidence_status: PAPER_EXACT
+  global_batch_size:
+    value: 128
+    evidence_status: PAPER_EXACT
+  optimizer:
+    value: adamw
+    betas: [0.9, 0.999]
+    epsilon: 1.0e-8
+    evidence_status: INFERRED_RECONSTRUCTION
+  learning_rate:
+    base:
+      value: 1.0e-4
+      evidence_status: PAPER_EXACT
+    gaussian_rho:
+      value: 1.0e-3
+      evidence_status: PAPER_EXACT
+  weight_decay:
+    ordinary:
+      value: 1.0e-2
+      evidence_status: PAPER_EXACT
+    gaussian_rho: 0.0
+  schedule:
+    value: constant
+    warmup_epochs: 0
+    evidence_status: INFERRED_RECONSTRUCTION
+  gradient_clip_norm: null
+  checkpoint_epochs: [0, 1, 5, 10, 20, 40, 60, 80, 100, 120]
+  seeds: [17, 29, 43, 71, 101]
+
+evaluation:
+  daily_pooling:
+    value: mean_all_24_contextual_tokens
+    evidence_status: PAPER_EXACT
+  linear_probe:
+    classifier: logistic_regression
+    penalty: l2
+    C: 1.0
+    solver: lbfgs
+    max_iter: 1000
+    standardize_features: true
+    folds: 5
+    repeats: 10
+    group: subject
+    metrics: [pr_auc, roc_auc, macro_f1]
+    evidence_status_for_C_and_scaling: INFERRED_RECONSTRUCTION
+  few_shot:
+    subjects_per_class: [1, 2, 3, 4, 5]
+    observation_fractions: [0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50]
+    samplings_per_fold: 5
+  multiday:
+    kmax_default: 7
+    kmax_hall: 4
+    pooling: [mean, concat_mean_max]
+  fairness:
+    dimensions:
+      - diabetes_status_or_type
+      - age_band
+      - sex_or_gender_as_recorded
+      - device_family
+      - dataset
+      - glycemic_range
+      - observation_density_quartile
+
+export:
+  formats: [safetensors, onnx]
+  onnx:
+    opset: current_supported
+    fixed_sequence_length: 288
+    dynamic_batch: true
+  outputs:
+    - contextual_tokens
+    - daily_embedding
+    - state_tokens
+    - event_tokens
+    - state_signal
+    - event_signal
+    - patch_density
+    - sigma
+  fp32_onnx_min_cosine_similarity: 0.99999

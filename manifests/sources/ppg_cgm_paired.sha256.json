@@ -1,0 +1,22 @@
+{
+  "dataset_id": "ppg_cgm_paired",
+  "lane": "D",
+  "source_version": "zenodo_20577959",
+  "license": "CC-BY-4.0",
+  "n_files": 1,
+  "total_bytes": 346734,
+  "files": [
+    {
+      "relative_path": "Paper.pdf",
+      "content_role": "sidecar",
+      "bytes": 346734,
+      "sha256": "92ba95f1885937f30a4dbb4c936bbb94a0c7821052a4954f25df0a93976e9567"
+    }
+  ],
+  "skipped_large": [
+    {
+      "relative_path": "Data.zip",
+      "bytes": 3503363523
+    }
+  ]
+}

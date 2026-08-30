@@ -1,0 +1,64 @@
+[project]
+name = "opencgm-stateevent"
+version = "0.0.1"
+description = "Independent public-data reconstruction of the GlucoFM dual-stream CGM method"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Stephane Fourdrinier" }]
+keywords = ["cgm", "glucose", "foundation-model", "jepa", "time-series"]
+
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pyarrow>=15.0",
+    "polars>=1.0",
+    "pandas>=2.2",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.4",
+    "safetensors>=0.4",
+    "openpyxl>=3.1",
+    "xlrd>=2.0",
+    "typer>=0.12",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+cuda = ["torch>=2.4"]
+export = ["onnx>=1.16", "onnxruntime>=1.18"]
+api = ["fastapi>=0.110", "uvicorn[standard]>=0.27"]
+#: `just app`. Kept out of the default install because the demo is optional.
+app = ["streamlit>=1.35", "pandas>=2.2"]
+dev = ["pytest>=8.2", "pytest-cov>=5.0", "hypothesis>=6.100", "ruff>=0.5", "pyright>=1.1"]
+
+[project.scripts]
+opencgm = "opencgm_stateevent.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opencgm_stateevent"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+# torch.nn.functional as F is universal convention.
+ignore = ["N812"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "golden: numerical parity against a reference implementation",
+    "leakage: split and identity leakage gates",
+    "gpu: requires CUDA",
+]
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.11"

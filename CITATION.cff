@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+title: OpenCGM-StateEvent
+message: >-
+  An independent public-data reconstruction of the GlucoFM method. If you use this software,
+  please cite both this reconstruction and the original paper referenced below.
+type: software
+authors:
+  - family-names: Fourdrinier
+    given-names: Stephane
+license: Apache-2.0
+repository-code: https://github.com/sfourdrinier/opencgm
+abstract: >-
+  A ~0.72M-parameter dual-stream foundation model for continuous glucose monitoring,
+  reimplemented from the GlucoFM publication and trained on public CGM cohorts. Not
+  affiliated with or derived from any Google implementation or checkpoint.
+references:
+  - type: article
+    title: "GlucoFM: A Dual-Stream Foundation Model for Continuous Glucose Monitoring"
+    url: https://arxiv.org/abs/2605.30865v2
+    notes: >-
+      Original method. This project reimplements it independently from the publication; no
+      official source code or weights were available at the 2026-08-27 evidence cutoff.

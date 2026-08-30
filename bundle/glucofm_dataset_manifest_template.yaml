@@ -1,0 +1,85 @@
+# Copy once per source dataset/version. Never edit a manifest for a completed run;
+# create a new version and hash it.
+
+dataset_id: replace_me
+manifest_version: "1"
+role: strict_pretrain # strict_pretrain | downstream | public_plus | restricted
+
+source:
+  title: null
+  authors: []
+  version: null
+  doi: null
+  landing_page: null
+  original_publication: null
+  acquired_at_utc: null
+
+rights:
+  license_identifier: unresolved
+  license_url: null
+  terms_url: null
+  raw_download_allowed: null
+  raw_redistribution_allowed: null
+  processed_data_redistribution_allowed: null
+  commercial_use_allowed: null
+  derivatives_allowed: null
+  model_weight_release_status: unresolved
+  review_notes: []
+
+files:
+  - relative_path: null
+    content_role: cgm
+    source_url: null
+    bytes: null
+    sha256: null
+
+population:
+  source_subject_count: null
+  source_session_count: null
+  diabetes_statuses: []
+  geography: null
+  devices: []
+  native_cadence_minutes: []
+
+selection:
+  expected_paper_records_or_entries: null
+  expected_paper_hours: null
+  include_ids: []
+  exclude_ids: []
+  exclusion_reasons: {}
+  paper_compatible_split_manifest: null
+  biological_person_disjoint_split_manifest: null
+
+identity:
+  source_subject_column: null
+  biological_person_mapping: null
+  session_mapping: null
+  repeat_visit_behavior: null
+  duplicate_source_fingerprints: []
+
+adapter:
+  module: null
+  timestamp_column: null
+  value_column: null
+  unit: null
+  local_time_status: unresolved
+  binning_rule: unresolved
+  sentinel_rules: []
+  duplicate_timestamp_rule: mean
+
+reconciliation:
+  raw_rows: null
+  valid_real_readings: null
+  subjects: null
+  biological_people: null
+  sessions: null
+  continuous_segments: null
+  observed_hours: null
+  strict_windows: null
+  paper_difference_notes: []
+
+provenance:
+  canonicalization_config_hash: null
+  source_manifest_sha256: null
+  generated_at_utc: null
+  code_git_sha: null

@@ -1,0 +1,17 @@
+{
+  "dataset_id": "shanghai_t2dm",
+  "lane": "A",
+  "source_version": "figshare_20444397_v3",
+  "license": "CC-BY-4.0",
+  "n_files": 1,
+  "total_bytes": 3418039,
+  "files": [
+    {
+      "relative_path": "data.zip",
+      "content_role": "sidecar",
+      "bytes": 3418039,
+      "sha256": "5ea3d97d189edc38de69a73ab5a7b653085c5cda4691b2eabe2a474295e0d05e"
+    }
+  ],
+  "skipped_large": []
+}

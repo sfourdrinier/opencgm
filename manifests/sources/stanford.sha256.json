@@ -1,0 +1,41 @@
+{
+  "dataset_id": "stanford",
+  "lane": "A",
+  "source_version": "git_94d647944c001dfa34492fd593b6e4804c1f45c4",
+  "license": "verify",
+  "n_files": 5,
+  "total_bytes": 17057095,
+  "files": [
+    {
+      "relative_path": ".pinned_commit",
+      "content_role": "sidecar",
+      "bytes": 41,
+      "sha256": "ac303183e0fe966e035eac667bf8070497baab8f9199ebc70f57a64eb3ee6e96"
+    },
+    {
+      "relative_path": "filtered_cgm_03222026.csv",
+      "content_role": "cgm",
+      "bytes": 16792478,
+      "sha256": "ebbb595be90a32b3e105095fa8ffc9f91617f93aaead579dff9db272be4515da"
+    },
+    {
+      "relative_path": "filtered_metabolic_tests.csv",
+      "content_role": "cgm",
+      "bytes": 4589,
+      "sha256": "192b5f876b96cf6c0f256f9664f83528dca523187c3e32b68497eb827ad77033"
+    },
+    {
+      "relative_path": "filtered_ogtt_glucose_timeseries_ctru_athome_venous_cgm_03222026.csv",
+      "content_role": "cgm",
+      "bytes": 254622,
+      "sha256": "5b5965b529da263bae426f40cb1e8d9a33de8747a4813113cb99694c2f614484"
+    },
+    {
+      "relative_path": "filtered_study_participants_characteristics.csv",
+      "content_role": "cgm",
+      "bytes": 5365,
+      "sha256": "a07a000dc7e319c9184d9c234cb4b799052c621da8ec7cd06d54081abcbebf88"
+    }
+  ],
+  "skipped_large": []
+}

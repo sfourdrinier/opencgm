@@ -1,0 +1,38 @@
+{
+  "checkpoint": "runs_5090/rawstats120/ckpt_ep040.pt",
+  "epoch": 40,
+  "seed": 17,
+  "architecture": {
+    "raw_statistics": true,
+    "normalize_targets": false,
+    "streams": "both",
+    "learnable_sigma": true,
+    "use_circadian": true,
+    "zero_empty_patches": false
+  },
+  "opset": 17,
+  "input_names": [
+    "values",
+    "mask",
+    "circadian_start"
+  ],
+  "input_dtypes": [
+    "float32",
+    "float32",
+    "int64"
+  ],
+  "input_shapes": [
+    "[B, 288]",
+    "[B, 288]",
+    "[B]"
+  ],
+  "output_names": [
+    "embedding"
+  ],
+  "output_dtype": "float32",
+  "output_shape": "[B, 128]",
+  "size_bytes": 1991782,
+  "sha256": "b1349deffd15ab62a5a98d7c7c4a7e143bcf1dee7ad745b1e05533ff54f34768",
+  "mask_convention": "0 = unobserved, 1 = observed; never interpolate before this point",
+  "units": "mg/dL"
+}

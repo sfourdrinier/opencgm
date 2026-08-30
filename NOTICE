@@ -1,0 +1,42 @@
+OpenCGM-StateEvent
+Copyright 2026 Stephane Fourdrinier
+
+This product is an independent reconstruction of the method described in:
+  "GlucoFM: A Dual-Stream Foundation Model for Continuous Glucose Monitoring",
+  arXiv:2605.30865v2.
+
+It is not affiliated with, endorsed by, or derived from any Google implementation
+or checkpoint. No official GlucoFM source code or weights were available at the
+evidence cutoff of 2026-08-27. The method was reimplemented from the publication.
+
+## Licensing
+
+This repository contains two distinct artefacts under two distinct licenses:
+
+| Artefact | Location | License |
+|---|---|---|
+| Source code (this repository, including `src/`, `scripts/`, `tests/`, `web/`) | every `.py`, `.ts`, `.tsx`, `.js`, `.mjs`, `.sh`, `.yaml`, `.md`, `.txt` file | **Apache-2.0** — see `LICENSE` |
+| Trained encoder weights | `artifacts/glucofm_encoder.onnx` | **CC-BY-NC-4.0** — see `LICENSE-WEIGHTS` |
+| Fitted phenotype heads | `artifacts/glucofm_heads.json` | **CC-BY-NC-SA-4.0** — share-alike inherited from CGMacros; see `LICENSE-HEADS` and `DECISIONS.md` D025 |
+| Encoder, copied so the web demo and API can serve it | `web/public/models/encoder.onnx` | **CC-BY-NC-4.0** — see `LICENSE-WEIGHTS` |
+| Published probe heads | `web/public/models/heads.json` | **CC-BY-NC-SA-4.0** — see `LICENSE-HEADS` |
+
+The two licenses are independent. A commercial entity may use the code under Apache-2.0
+without using the weights. The weights are research / non-commercial only; a commercial
+license can be negotiated with the maintainer.
+
+## Data
+
+Training data originate from independent third-party sources, each under its own license.
+See `manifests/sources/registry.yaml` for the per-source contribution and rights record.
+Dataset licenses are NOT granted by this project's Apache-2.0 code license or by the
+weights' CC-BY-NC-4.0 license.
+
+Lane E sources (cgmacros, uchtt1dm, glucofm_bench) — NC/ND/SA — never enter the released
+encoder. See `bundle/BLUEPRINT_AMENDMENTS.md` A4 and `DECISIONS.md` D002.
+
+## Not a medical device
+
+This software is for research use. It is not a medical device and must not be used for
+diagnosis, treatment, or dosing decisions. The original paper describes GlucoFM as a
+research prototype.

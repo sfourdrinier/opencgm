@@ -1,0 +1,224 @@
+# Source registry — the single machine-readable truth about what we have and may use.
+# `opencgm data status` reads this and checks it against the filesystem.
+# Lanes: A strict_public | B downstream | C public_plus | D ppg_bridge | E eval_only
+# Amendments to the blueprint are recorded in bundle/BLUEPRINT_AMENDMENTS.md.
+
+registry_version: "1"
+raw_root: data/raw
+
+sources:
+  # ---- Lane A: the four GlucoFM strict pretraining cohorts -------------------
+  - dataset_id: big_ideas
+    lane: A
+    role: strict_pretrain
+    path: big_ideas/1.1.2
+    source_version: "1.1.2"
+    doi: 10.13026/zthx-5212
+    landing_page: https://physionet.org/content/big-ideas-glycemic-wearable/1.1.2/
+    license: ODC-By-1.0
+    access: open
+    native_cadence_minutes: 5
+    device_family: dexcom
+    expected_records: 16
+    expected_hours: 3017
+    cgm_glob: "*/Dexcom_*.csv"
+    weight_release: permissive_pending_review
+
+  - dataset_id: shanghai_t2dm
+    lane: A
+    role: strict_pretrain
+    path: shanghai/figshare_20444397_v3
+    source_version: figshare_20444397_v3
+    doi: 10.6084/m9.figshare.20444397
+    license: CC-BY-4.0
+    access: open
+    native_cadence_minutes: 15
+    device_family: libre
+    expected_records: 44
+    expected_hours: 12414
+    cgm_glob: "data.zip"
+    weight_release: permissive
+    notes:
+      - "Blueprint §30 collection id 5137813 is WRONG; see AMENDMENTS A1."
+      - "Zip filenames are GBK-encoded; extract with `unzip -O GBK`."
+      - "One .xls per recording visit: person_id and visit_id must be built separately."
+
+  - dataset_id: stanford
+    lane: A
+    role: strict_pretrain
+    path: stanford/github_94d647944c001dfa34492fd593b6e4804c1f45c4
+    source_version: git_94d647944c001dfa34492fd593b6e4804c1f45c4
+    landing_page: https://github.com/aametwally/Metabolic_Subphenotype_Predictor
+    license: verify
+    access: open
+    native_cadence_minutes: 5
+    expected_records: 19
+    expected_hours: 8761
+    cgm_glob: "filtered_cgm_03222026.csv"
+    weight_release: legal_review_required
+    notes:
+      - "cgmdb.stanford.edu data_cgm.csv is spline-smoothed meal curves — NOT the CGM series. AMENDMENTS A2."
+      - "Timestamps sit at :51s, not on 5-min boundaries — drives the floor/nearest audit (§9.3)."
+      - "56 subjects observed = paper's 19 pretrain + 37 downstream exactly."
+
+  - dataset_id: colas
+    lane: A
+    role: strict_pretrain
+    path: colas/plos_pone_0225817
+    source_version: plos_s001
+    doi: 10.1371/journal.pone.0225817
+    license: CC-BY-4.0
+    access: open
+    native_cadence_minutes: 5
+    device_family: ipro
+    expected_records: 206
+    expected_hours: 9544
+    cgm_glob: "S1_supporting.zip"
+    weight_release: permissive
+    notes:
+      - "208 case CSVs ship; paper uses 206. Blueprint §6.6 wants a rejection report, not a silent drop."
+
+  # ---- Lane B: downstream evaluation ----------------------------------------
+  - dataset_id: hall
+    lane: B
+    role: downstream
+    path: hall/plos_pbio_2005143
+    source_version: plos_s010_s017
+    doi: 10.1371/journal.pbio.2005143
+    license: CC-BY-4.0
+    access: open
+    native_cadence_minutes: 5
+    expected_records: 56
+    expected_hours: 7090
+    cgm_glob: "S1_cgm_timeseries.tsv"
+    weight_release: permissive
+    notes:
+      - "CGM series is supporting file s010, gzipped with no .gz extension. AMENDMENTS A3."
+      - "Privacy date-shift: DisplayTime 2014 vs InternalTime 2016. circadian_confidence=preserved_but_shifted."
+
+  # ---- Lane E: evaluation only (NC/ND/SA) -----------------------------------
+  # Never enters a distributed checkpoint. See AMENDMENTS A4.
+  - dataset_id: cgmacros
+    lane: E
+    role: downstream
+    path: cgmacros/1.0.0
+    source_version: "1.0.0"
+    doi: 10.13026/3z8q-x658
+    license: CC-BY-NC-SA-4.0
+    license_confidence: unverified
+    access: open
+    native_cadence_minutes: [5, 15]
+    expected_records: 45
+    cgm_glob: "CGMacros_dateshifted365.zip"
+    weight_release: forbidden_sharealike
+    notes:
+      - "PhysioNet LICENSE.txt was empty at cutoff; NC-SA label came from the GlucoFM-Bench survey."
+      - "Confirm against landing page + publication before any release decision."
+
+  - dataset_id: uchtt1dm
+    lane: E
+    role: external_validation
+    path: uchtt1dm_EVAL_ONLY_ccbyncnd
+    source_version: git_4bc4ba89152cd8e93e0a129ba27bd66bb1e70ad5
+    doi: 10.1109/ojemb.2024.3365290
+    license: CC-BY-NC-ND-4.0
+    license_confidence: crossref_verified
+    access: open
+    native_cadence_minutes: 5
+    device_family: guardian_3
+    expected_records: 20
+    expected_hours: 2605
+    cgm_glob: "UC_HT_T1DM/*/Glucose.xlsx"
+    weight_release: forbidden_noderivatives
+    notes:
+      - "ND restricts SHARING derivatives, not creating them (CC 4.0 §2(a)(1)(B)). Eval is fine."
+      - "11 healthy + 9 T1DM. Closest available proxy for the missing Wear-CGM healthy population."
+      - "Guardian Sensor 3 + Chile: free device and geography shift for §19.11 fairness reporting."
+
+  - dataset_id: glucofm_bench
+    lane: E
+    role: source_index
+    path: glucofm_bench_hf
+    source_version: hf_main
+    landing_page: https://huggingface.co/datasets/glucofmbench/GlucoFM-Bench
+    license: CC-BY-NC-SA-4.0
+    access: open
+    cgm_glob: "data/*.parquet"
+    weight_release: forbidden_sharealike
+    notes:
+      - "Interpolates gaps <1h — destroys the physical missingness the method needs (§6.9)."
+      - "Use as source index and adapter cross-check only. Never as pretraining input."
+
+  # ---- Lane C: public-plus candidates ---------------------------------------
+  - dataset_id: hupa_ucm
+    lane: C
+    role: public_plus
+    path: hupa_ucm_mendeley_3hbcscwz44
+    source_version: mendeley_v1
+    doi: 10.17632/3hbcscwz44.1
+    license: CC-BY-4.0
+    access: open
+    native_cadence_minutes: 5
+    cgm_glob: "*glucose*.csv"
+    weight_release: permissive_pending_review
+
+  - dataset_id: azt1d
+    lane: C
+    role: public_plus
+    path: azt1d_mendeley_gk9m674wcx
+    source_version: mendeley_v1
+    license: CC-BY-4.0
+    access: open
+    cgm_glob: "AZT1D_2025.zip"
+    weight_release: permissive_pending_review
+
+  - dataset_id: t1d_uom
+    lane: C
+    role: public_plus
+    path: t1d_uom_zenodo_15806142
+    source_version: zenodo_15806142
+    license: CC-BY-4.0
+    access: open
+    cgm_glob: "*.zip"
+    weight_release: permissive_pending_review
+
+  - dataset_id: bris_t1d
+    lane: C
+    role: public_plus
+    path: bris_t1d_open
+    source_version: data_bris_33z5jc8fa6tob21ptrugzqog08
+    license: CC-BY-4.0
+    access: open
+    cgm_glob: "*.zip"
+    weight_release: permissive_pending_review
+
+  # ---- Lane D: PPG bridge for the later teacher/student project -------------
+  - dataset_id: ppg_cgm_paired
+    lane: D
+    role: ppg_bridge
+    path: ppg_cgm_paired_zenodo_20577959
+    source_version: zenodo_20577959
+    license: CC-BY-4.0
+    access: open
+    cgm_glob: "Data.zip"
+    weight_release: permissive_pending_review
+
+  - dataset_id: ppg_capillary
+    lane: D
+    role: ppg_auxiliary
+    path: ppg_capillary_zenodo_21978226
+    source_version: zenodo_21978226
+    license: CC0-1.0
+    access: open
+    cgm_glob: "stuba_ppg_bgl_dataset.zip"
+    weight_release: permissive
+    notes:
+      - "Capillary reference, not continuous CGM. Out of scope for GlucoFM reproduction (§6.9)."
+
+# Deliberately NOT acquired.
+excluded:
+  - dataset_id: wear_cgm
+    reason: non_public
+    expected_records: 192
+    expected_hours: 75330
+    note: "69% of the paper's pretraining hours. Exact reproduction impossible by construction."
