@@ -23,7 +23,8 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-dropzone": "^14.2.0",
-    "recharts": "^2.13.0"
+    "recharts": "^2.13.0",
+    "unified-ble-manager": "4.0.10"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
