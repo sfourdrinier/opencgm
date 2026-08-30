@@ -57,10 +57,15 @@ export type SensorTimer = { readonly sleep: (delayMs: number) => Promise<void> }
 export type SensorControllerDependencies = {
   readonly createManager: () => Promise<SensorManager>;
   readonly createEngine: () => Promise<SensorEngineRuntime>;
+  readonly loadCredential?: (peerId: string) => Promise<Uint8Array | null>;
+  readonly saveCredential?: (peerId: string, credential: Uint8Array) => Promise<void>;
+  readonly onPeerSelected?: (peerId: string) => void;
   readonly clock: () => number;
   readonly timer: SensorTimer;
   readonly entropy: (byteCount: number) => Uint8Array;
 };
+
+export type SensorCredentialCallbacks = Pick<SensorControllerDependencies, "loadCredential" | "saveCredential" | "onPeerSelected">;
 
 export type SensorControllerOptions = {
   readonly serviceUuid: string;
@@ -83,6 +88,7 @@ export type SensorController = {
 
 export function createDefaultSensorController(
   options: SensorControllerOptions,
+  credentialCallbacks: SensorCredentialCallbacks = {},
 ): SensorController {
   return createSensorController(
     {
@@ -132,6 +138,7 @@ export function createDefaultSensorController(
         const loaded = await loadSensorEngine();
         return { push: loaded.push, stop: loaded.stop };
       },
+      ...credentialCallbacks,
       clock: () => Date.now(),
       timer: { sleep: async delayMs => new Promise(resolve => setTimeout(resolve, delayMs)) },
       entropy: byteCount => crypto.getRandomValues(new Uint8Array(byteCount)),
@@ -169,6 +176,7 @@ export function createSensorController(
   async function run(request: SensorImportRequest): Promise<SensorImportResult> {
     manager = await dependencies.createManager();
     engine = await dependencies.createEngine();
+    if (stopped) throw new Error("sensor controller stopped");
     destroyPromise = null;
     recordsForCurrentRun = [];
     metadataForCurrentRun = null;
@@ -176,6 +184,7 @@ export function createSensorController(
     let completeness: SensorImportResult["completeness"] = "partial";
     const warnings: string[] = [];
     const maxAttempts = Math.max(1, options.maxAttempts ?? 2);
+    credentialPersistenceFailedForCurrentRun = false;
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         let connection: SensorConnection | null = null;
@@ -185,25 +194,34 @@ export function createSensorController(
             filters: [{ serviceUuids: [options.serviceUuid] }],
             optionalServices: [...(options.optionalServices ?? [])],
           });
+          dependencies.onPeerSelected?.(peer.id);
+          if (stopped) throw new Error("sensor controller stopped");
+          const rememberedCredential = request.credential === undefined || request.credential === null
+            ? await dependencies.loadCredential?.(peer.id) ?? null
+            : null;
+          if (stopped) throw new Error("sensor controller stopped");
           connection = await manager!.connect(peer);
+          if (stopped) throw new Error("sensor controller stopped");
           const database = await connection.discover();
+          if (stopped) throw new Error("sensor controller stopped");
           if (connection.lifecycleEvents !== undefined) pumpLifecycle(connection.lifecycleEvents, () => { generation.value += 1; });
           const startActions = await engine.push({
             kind: "start",
             nowMs: dependencies.clock(),
             sensorName: request.sensorName,
-            credential: request.credential ?? null,
+            credential: request.credential ?? rememberedCredential,
             pairingCode: request.pairingCode ?? null,
             certificateBundle: request.certificateBundle ?? null,
           });
-          await processActions(startActions, database, generation);
+          await processActions(startActions, database, generation, generation.value, peer.id);
           completeness = "complete";
           break;
         } catch (error) {
           warnings.push(error instanceof Error ? error.message : "sensor operation failed");
           if (connection !== null) await disconnectOnce(connection);
-          if (attempt === maxAttempts && recordsForCurrentRun.length === 0) throw error;
+          if (credentialPersistenceFailedForCurrentRun || (attempt === maxAttempts && recordsForCurrentRun.length === 0)) throw error;
         } finally {
+          generation.value += 1;
           if (connection !== null) await disconnectOnce(connection);
         }
       }
@@ -217,7 +235,7 @@ export function createSensorController(
     }
   }
 
-  async function processActions(actions: readonly EngineAction[], database: SensorDatabase, generation: { value: number }, expectedGeneration = generation.value): Promise<void> {
+  async function processActions(actions: readonly EngineAction[], database: SensorDatabase, generation: { value: number }, expectedGeneration = generation.value, peerId = ""): Promise<void> {
     for (const action of actions) {
       if (stopped) throw new Error("sensor controller stopped");
       if (generation.value !== expectedGeneration) throw new Error("stale sensor action");
@@ -228,22 +246,29 @@ export function createSensorController(
       else if (action.kind === "request-os-pair") throw new Error("browser Web Bluetooth does not support OS pairing");
       else if (action.kind === "need-entropy") {
         const next = await engine!.push({ kind: "action-result", actionId: action.actionId, ok: true, bytes: dependencies.entropy(action.byteCount) });
-        await processActions(next, database, generation, expectedGeneration);
+        await processActions(next, database, generation, expectedGeneration, peerId);
       } else if (action.kind === "subscribe") {
         const characteristic = database.characteristic(options.serviceUuid, options.channels[action.channel]);
         const subscription = await characteristic.subscribe();
         subscriptions.push(subscription);
-        pumpNotifications(subscription.values, database, generation, action.channel);
+        pumpNotifications(subscription.values, database, generation, action.channel, peerId, expectedGeneration);
         const next = await engine!.push({ kind: "action-result", actionId: action.actionId, ok: true, bytes: new Uint8Array() });
-        await processActions(next, database, generation, expectedGeneration);
+        await processActions(next, database, generation, expectedGeneration, peerId);
       } else if (action.kind === "write") {
         const characteristic = database.characteristic(options.serviceUuid, options.channels[action.channel]);
         await characteristic.write(action.bytes, { response: action.response });
         if (action.delayAfterMs > 0) await dependencies.timer.sleep(action.delayAfterMs);
         const next = await engine!.push({ kind: "action-result", actionId: action.actionId, ok: true, bytes: new Uint8Array() });
-        await processActions(next, database, generation, expectedGeneration);
+        await processActions(next, database, generation, expectedGeneration, peerId);
       } else if (action.kind === "persist-credential") {
-        void action.credential;
+        if (dependencies.saveCredential !== undefined) {
+          try {
+            await dependencies.saveCredential(peerId, new Uint8Array(action.credential));
+          } catch (error) {
+            credentialPersistenceFailedForCurrentRun = true;
+            throw error;
+          }
+        }
       }
     }
   }
@@ -252,15 +277,16 @@ export function createSensorController(
   let recordsForCurrentRun: ImportedSensorReading[] = [];
   let metadataForCurrentRun: SensorImportMetadata | null = null;
   let completionForCurrentRun = false;
+  let credentialPersistenceFailedForCurrentRun = false;
   const subscriptions: SensorSubscription[] = [];
 
-  async function pumpNotifications(values: AsyncIterable<{ readonly value: Uint8Array }>, database: SensorDatabase, generation: { value: number }, channel: SensorChannel): Promise<void> {
+  async function pumpNotifications(values: AsyncIterable<{ readonly value: Uint8Array }>, database: SensorDatabase, generation: { value: number }, channel: SensorChannel, peerId: string, expectedGeneration: number): Promise<void> {
     try {
       for await (const event of values) {
-        if (generation.value < 1 || stopped || engine === null) throw new Error("stale sensor notification");
+        if (generation.value !== expectedGeneration || stopped || engine === null) throw new Error("stale sensor notification");
         const currentEngine = engine;
         const actions = await currentEngine.push({ kind: "frame", channel, bytes: new Uint8Array(event.value), nowMs: dependencies.clock() });
-        await processActions(actions, database, generation);
+        await processActions(actions, database, generation, expectedGeneration, peerId);
       }
     } catch {
       // Notification streams are best-effort after the direct operation's result;

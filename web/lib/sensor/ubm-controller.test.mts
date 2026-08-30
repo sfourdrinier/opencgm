@@ -111,3 +111,190 @@ test("fails truthfully when the engine requests unsupported browser OS pairing",
   const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
   await assert.rejects(controller.importSensor({ sensorName: "sensor-a", userActivation: true }), /does not support OS pairing/);
 });
+
+test("loads remembered credentials by chooser peer id before start while explicit credentials win", async () => {
+  const fake = fakeManager();
+  const lookedUp: string[] = [];
+  const starts: (Uint8Array | null)[] = [];
+  const remembered = new Uint8Array([7]);
+  const explicit = new Uint8Array([8]);
+  let runs = 0;
+  const deps: SensorControllerDependencies = {
+    createManager: async () => fake.manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => {
+        if (command.kind !== "start") return [];
+        starts.push(command.credential);
+        return [{ kind: "complete", completeness: "partial" }];
+      },
+      stop: async () => undefined,
+    }),
+    loadCredential: async (peerId) => { lookedUp.push(peerId); return remembered; },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "editable name", userActivation: true });
+  runs += 1;
+  await controller.importSensor({ sensorName: "another name", userActivation: true, credential: explicit });
+
+  assert.deepEqual(lookedUp, ["peer"]);
+  assert.deepEqual(starts, [remembered, explicit]);
+  assert.equal(runs, 1);
+});
+
+test("awaits credential persistence and scopes it to the selected peer", async () => {
+  const fake = fakeManager();
+  const saves: Array<{ peerId: string; credential: Uint8Array }> = [];
+  let saveFinished = false;
+  const credential = new Uint8Array([9]);
+  const deps: SensorControllerDependencies = {
+    createManager: async () => fake.manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => command.kind === "start"
+        ? [{ kind: "persist-credential", credential }, { kind: "complete", completeness: "complete" }]
+        : [],
+      stop: async () => undefined,
+    }),
+    saveCredential: async (peerId, value) => {
+      saves.push({ peerId, credential: value });
+      await Promise.resolve();
+      saveFinished = true;
+    },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "editable name", userActivation: true });
+
+  assert.deepEqual(saves, [{ peerId: "peer", credential }]);
+  assert.equal(saveFinished, true);
+});
+
+test("does not persist stale actions after a retry or stop", async () => {
+  const fake = fakeManager();
+  const saves: string[] = [];
+  let releaseStart: (() => void) | undefined;
+  const startGate = new Promise<void>(resolve => { releaseStart = resolve; });
+  const deps: SensorControllerDependencies = {
+    createManager: async () => fake.manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => command.kind === "start"
+        ? (await startGate, [{ kind: "persist-credential", credential: new Uint8Array([1]) }])
+        : [],
+      stop: async () => undefined,
+    }),
+    saveCredential: async (peerId) => { saves.push(peerId); },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 2, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  const importing = controller.importSensor({ sensorName: "sensor", userActivation: true });
+  await Promise.resolve();
+  await controller.stop();
+  releaseStart?.();
+  await assert.rejects(importing, /stopped/);
+  assert.deepEqual(saves, []);
+});
+
+test("does not persist a notification action from a prior retry generation", async () => {
+  let attempt = 0;
+  let releaseOldFrame: (() => void) | undefined;
+  const oldFrameGate = new Promise<void>(resolve => { releaseOldFrame = resolve; });
+  const saves: string[] = [];
+  const manager = {
+    choose: async () => {
+      attempt += 1;
+      if (attempt === 2) releaseOldFrame?.();
+      return { id: `peer-${attempt}` };
+    },
+    connect: async () => {
+      const connectionAttempt = attempt;
+      return {
+        discover: async () => ({
+          characteristic: () => ({
+            subscribe: async () => ({
+              values: (async function* () {
+                if (connectionAttempt === 1) { await oldFrameGate; yield { value: new Uint8Array([1]) }; }
+              })(),
+              remove: async () => undefined,
+            }),
+            write: async () => undefined,
+          }),
+        }),
+        disconnect: async () => undefined,
+      };
+    },
+    destroy: async () => undefined,
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => {
+        if (command.kind === "start") return [{ kind: "subscribe", actionId: 1, channel: "authentication" }];
+        if (command.kind === "action-result" && attempt === 1) return [{ kind: "failure", category: "history-incomplete" }];
+        if (command.kind === "frame") return [{ kind: "persist-credential", credential: new Uint8Array([2]) }];
+        return [{ kind: "complete", completeness: "complete" }];
+      },
+      stop: async () => undefined,
+    }),
+    saveCredential: async (peerId) => { saves.push(peerId); },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 2, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "sensor", userActivation: true });
+  await Promise.resolve();
+  assert.deepEqual(saves, []);
+});
+
+test("fails closed when remembered credential lookup fails", async () => {
+  const fake = fakeManager();
+  let started = false;
+  const deps: SensorControllerDependencies = {
+    createManager: async () => fake.manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => {
+        if (command.kind === "start") { started = true; return []; }
+        return [];
+      },
+      stop: async () => undefined,
+    }),
+    loadCredential: async () => { throw new Error("vault unavailable"); },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await assert.rejects(controller.importSensor({ sensorName: "sensor", userActivation: true }), /vault unavailable/);
+  assert.equal(started, false);
+});
+
+test("fails closed when credential persistence fails", async () => {
+  const fake = fakeManager();
+  const deps: SensorControllerDependencies = {
+    createManager: async () => fake.manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => command.kind === "start"
+        ? [{ kind: "reading", reading }, { kind: "persist-credential", credential: new Uint8Array([3]) }]
+        : [],
+      stop: async () => undefined,
+    }),
+    saveCredential: async () => { throw new Error("vault write failed"); },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await assert.rejects(controller.importSensor({ sensorName: "sensor", userActivation: true }), /vault write failed/);
+});

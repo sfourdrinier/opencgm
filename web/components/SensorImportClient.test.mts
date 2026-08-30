@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { SensorImportResult } from "../lib/sensor/contracts";
 import {
+  browserCapabilitySnapshot,
   browserSupportMessage,
   importProgressLabel,
   privacyCopy,
+  sensorImportCredentialCallbacks,
   sensorImportDiagnosticsVisible,
   sensorImportCoverage,
 } from "./SensorImportClient";
@@ -45,6 +47,12 @@ test("explains Chrome, sensor, Bluetooth, and origin prerequisites without a UA 
   assert.match(browserSupportMessage({ secureContext: false, bluetooth: true, origin: "http://localhost:3000" }), /ready/i);
 });
 
+test("recomputes localhost Bluetooth capability after client mount", () => {
+  const capability = browserCapabilitySnapshot({ secureContext: false, navigator: { bluetooth: {} }, origin: "http://localhost:3000" });
+  assert.deepEqual(capability, { secureContext: false, bluetooth: true, origin: "http://localhost:3000" });
+  assert.match(browserSupportMessage(capability), /ready/i);
+});
+
 test("summarises counts, duplicate rows, range, cadence, gaps, and completeness", () => {
   const summary = sensorImportCoverage(imported);
   assert.equal(summary.readings, 1);
@@ -77,4 +85,25 @@ test("reveals diagnostic credential inputs only for the exact debug query", () =
 
 test("uses the exact prominent local-processing privacy copy", () => {
   assert.equal(privacyCopy, "Your data stays in this browser. Sensor readings and credentials are processed locally and are never uploaded or sent to a backend.");
+});
+
+test("wires vault callbacks to the selected peer and keeps saving opt-in", async () => {
+  const loads: string[] = [];
+  const saves: Array<{ peerId: string; credential: Uint8Array }> = [];
+  const selected: string[] = [];
+  const vault = {
+    load: async (peerId: string) => { loads.push(peerId); return new Uint8Array([4]); },
+    save: async (peerId: string, credential: Uint8Array) => { saves.push({ peerId, credential }); },
+  };
+  const callbacks = sensorImportCredentialCallbacks(vault, true, peerId => selected.push(peerId));
+
+  callbacks.onPeerSelected?.("stable-peer");
+  const loaded = await callbacks.loadCredential?.("stable-peer");
+  await callbacks.saveCredential?.("stable-peer", new Uint8Array([5]));
+
+  assert.deepEqual(selected, ["stable-peer"]);
+  assert.deepEqual(loads, ["stable-peer"]);
+  assert.deepEqual(loaded, new Uint8Array([4]));
+  assert.deepEqual(saves, [{ peerId: "stable-peer", credential: new Uint8Array([5]) }]);
+  assert.equal(sensorImportCredentialCallbacks(vault, false, () => undefined).saveCredential, undefined);
 });

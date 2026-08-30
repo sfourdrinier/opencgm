@@ -8,7 +8,7 @@ import {
   createDefaultSensorController,
   getWebSensorSupport,
   type SensorController,
-  type WebSensorSupport,
+  type SensorCredentialCallbacks,
 } from "@/lib/sensor/ubm-controller";
 import { CredentialVault } from "@/lib/sensor/credential-vault";
 import type { SensorImportResult } from "@/lib/sensor/contracts";
@@ -24,7 +24,7 @@ export type BrowserCapabilityInput = {
 };
 
 export type SensorImportClientProps = {
-  readonly createController?: () => SensorController | Promise<SensorController>;
+  readonly createController?: (credentials?: SensorCredentialCallbacks) => SensorController | Promise<SensorController>;
   readonly createVault?: () => Promise<CredentialVault>;
 };
 
@@ -46,16 +46,36 @@ const DEFAULT_SENSOR_OPTIONS = {
   },
 };
 
-const defaultCreateController = () => createDefaultSensorController(DEFAULT_SENSOR_OPTIONS);
+const defaultCreateController = (credentials?: SensorCredentialCallbacks) => createDefaultSensorController(DEFAULT_SENSOR_OPTIONS, credentials);
 const defaultCreateVault = () => CredentialVault.createPersistentAsync();
 
-function initialBrowserCapability(): BrowserCapabilityInput | null {
-  if (typeof navigator === "undefined") return null;
+export function sensorImportCredentialCallbacks(
+  vault: Pick<CredentialVault, "load" | "save"> | null,
+  remember: boolean,
+  onPeerSelected: (peerId: string) => void,
+): SensorCredentialCallbacks {
   return {
-    secureContext: globalThis.isSecureContext,
-    bluetooth: "bluetooth" in navigator,
-    origin: typeof globalThis.location === "undefined" ? undefined : globalThis.location.origin,
+    loadCredential: vault ? (peerId) => vault.load(peerId) : undefined,
+    saveCredential: remember && vault ? (peerId, credential) => vault.save(peerId, credential) : undefined,
+    onPeerSelected,
   };
+}
+
+function initialBrowserCapability(): BrowserCapabilityInput | null {
+  if (typeof window === "undefined") return null;
+  return browserCapabilitySnapshot({
+    secureContext: window.isSecureContext,
+    navigator: window.navigator,
+    origin: window.location.origin,
+  });
+}
+
+export function browserCapabilitySnapshot(input: {
+  readonly secureContext: boolean;
+  readonly navigator: object;
+  readonly origin?: string;
+}): BrowserCapabilityInput {
+  return { secureContext: input.secureContext, bluetooth: "bluetooth" in input.navigator, origin: input.origin };
 }
 
 export function browserSupportMessage(input: BrowserCapabilityInput): string {
@@ -105,13 +125,11 @@ export function SensorImportClient({
   createVault = defaultCreateVault,
 }: SensorImportClientProps = {}) {
   const diagnosticsVisible = typeof window !== "undefined" && sensorImportDiagnosticsVisible(window.location.search);
-  const [capability] = useState<BrowserCapabilityInput | null>(initialBrowserCapability);
-  const [support] = useState<WebSensorSupport | null>(() => capability ? getWebSensorSupport(capability) : null);
+  const [capability, setCapability] = useState<BrowserCapabilityInput | null>(null);
+  const support = capability ? getWebSensorSupport(capability) : null;
   const [stage, setStage] = useState<ImportStage>("idle");
   const [sensorName, setSensorName] = useState("Dexcom G7");
   const [pairingCode, setPairingCode] = useState("");
-  const [credentialBytes, setCredentialBytes] = useState<Uint8Array | null>(null);
-  const [certificateBytes, setCertificateBytes] = useState<Uint8Array | null>(null);
   const [remember, setRemember] = useState(false);
   const [result, setResult] = useState<SensorImportResult | null>(null);
   const [analysis, setAnalysis] = useState<Awaited<ReturnType<typeof runReadingsAnalysis>>["analysis"] | null>(null);
@@ -119,17 +137,21 @@ export function SensorImportClient({
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<SensorController | null>(null);
   const vaultRef = useRef<CredentialVault | null>(null);
-  const rememberedCredentialRef = useRef<Uint8Array | null>(null);
+  const credentialRef = useRef<Uint8Array | null>(null);
+  const certificateRef = useRef<Uint8Array | null>(null);
+  const selectedPeerIdRef = useRef<string | null>(null);
   const cancelledRef = useRef(false);
   const mountedRef = useRef(true);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setCapability(initialBrowserCapability()));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
     void createVault().then((vault) => {
       if (mountedRef.current) vaultRef.current = vault;
-      void vault.load(sensorName).then((credential) => {
-        if (mountedRef.current) rememberedCredentialRef.current = credential;
-      }).catch(() => undefined);
     }).catch(() => undefined);
     return () => {
       mountedRef.current = false;
@@ -138,15 +160,6 @@ export function SensorImportClient({
       if (controller) void controller.stop();
     };
   }, [createVault]);
-
-  useEffect(() => {
-    const vault = vaultRef.current;
-    if (!vault) return;
-    rememberedCredentialRef.current = null;
-    void vault.load(sensorName).then((credential) => {
-      if (mountedRef.current) rememberedCredentialRef.current = credential;
-    }).catch(() => undefined);
-  }, [sensorName]);
 
   const stop = useCallback(async () => {
     const controller = controllerRef.current;
@@ -163,23 +176,20 @@ export function SensorImportClient({
     setProgress(importProgressLabel("connecting"));
     setStage("connecting");
     try {
-      const created = createController();
+      const vault = vaultRef.current;
+      const credentials = sensorImportCredentialCallbacks(vault, remember, (peerId) => { selectedPeerIdRef.current = peerId; });
+      const created = createController(credentials);
       const controller = created instanceof Promise ? await created : created;
       controllerRef.current = controller;
-      const credential = credentialBytes;
-      const certificateBundle = certificateBytes;
-      const remembered = rememberedCredentialRef.current;
       setStage("backfill");
       setProgress(importProgressLabel("backfill"));
       const imported = await controller.importSensor({
         sensorName,
         userActivation: true,
-        credential: credential ?? remembered,
+        credential: credentialRef.current,
         pairingCode: pairingCode.trim() || null,
-        certificateBundle,
+        certificateBundle: certificateRef.current,
       });
-      const vault = vaultRef.current;
-      if (remember && credential && vault) await vault.save(imported.metadata.sensorId, credential);
       if (!mountedRef.current || cancelledRef.current) return;
       setResult(imported);
       setStage("analysis");
@@ -200,7 +210,7 @@ export function SensorImportClient({
       setError(sensorImportError(caught));
       setProgress(importProgressLabel("error"));
     }
-  }, [certificateBytes, createController, credentialBytes, pairingCode, remember, stage, support, sensorName]);
+  }, [createController, pairingCode, remember, stage, support, sensorName]);
 
   const disconnect = useCallback(async () => {
     await stop();
@@ -211,13 +221,13 @@ export function SensorImportClient({
   }, [stop]);
 
   const forget = useCallback(async () => {
-    const id = result?.metadata.sensorId;
+    const id = selectedPeerIdRef.current;
     const vault = vaultRef.current;
     if (id && vault) await vault.forget(id);
-    setCredentialBytes(null);
+    credentialRef.current = null;
     setPairingCode("");
     setRemember(false);
-  }, [result]);
+  }, []);
 
   const busy = stage === "connecting" || stage === "backfill" || stage === "analysis";
   const coverage = result ? sensorImportCoverage(result) : null;
@@ -241,8 +251,8 @@ export function SensorImportClient({
           <label className="text-sm text-ink-soft">Sensor name<input value={sensorName} onChange={(event) => setSensorName(event.target.value)} className="mt-1 block w-full border border-rule-strong bg-paper px-3 py-2 text-ink" /></label>
           <label className="text-sm text-ink-soft">Pairing code (optional)<input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} inputMode="numeric" autoComplete="off" className="mt-1 block w-full border border-rule-strong bg-paper px-3 py-2 text-ink" /></label>
           {diagnosticsVisible ? <>
-            <label className="text-sm text-ink-soft">Remembered key (optional)<input type="file" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file) void file.arrayBuffer().then((bytes) => { if (mountedRef.current) setCredentialBytes(new Uint8Array(bytes)); }); else setCredentialBytes(null); }} className="mt-1 block w-full text-sm text-ink-soft file:mr-3 file:border file:border-rule-strong file:bg-paper file:px-3 file:py-1.5 file:text-xs" /></label>
-            <label className="text-sm text-ink-soft">Opaque certificate bundle (optional)<input type="file" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file) void file.arrayBuffer().then((bytes) => { if (mountedRef.current) setCertificateBytes(new Uint8Array(bytes)); }); else setCertificateBytes(null); }} className="mt-1 block w-full text-sm text-ink-soft file:mr-3 file:border file:border-rule-strong file:bg-paper file:px-3 file:py-1.5 file:text-xs" /></label>
+            <label className="text-sm text-ink-soft">Remembered key (optional)<input type="file" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file) void file.arrayBuffer().then((bytes) => { if (mountedRef.current) credentialRef.current = new Uint8Array(bytes); }); else credentialRef.current = null; }} className="mt-1 block w-full text-sm text-ink-soft file:mr-3 file:border file:border-rule-strong file:bg-paper file:px-3 file:py-1.5 file:text-xs" /></label>
+            <label className="text-sm text-ink-soft">Opaque certificate bundle (optional)<input type="file" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file) void file.arrayBuffer().then((bytes) => { if (mountedRef.current) certificateRef.current = new Uint8Array(bytes); }); else certificateRef.current = null; }} className="mt-1 block w-full text-sm text-ink-soft file:mr-3 file:border file:border-rule-strong file:bg-paper file:px-3 file:py-1.5 file:text-xs" /></label>
           </> : null}
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm text-ink-soft"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Remember this sensor on this browser</label>
