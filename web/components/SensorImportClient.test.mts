@@ -4,6 +4,8 @@ import type { SensorImportResult } from "../lib/sensor/contracts";
 import {
   browserSupportMessage,
   importProgressLabel,
+  privacyCopy,
+  sensorImportDiagnosticsVisible,
   sensorImportCoverage,
 } from "./SensorImportClient";
 
@@ -59,4 +61,20 @@ test("uses user-facing progress labels and never exposes protocol internals", ()
   assert.equal(importProgressLabel("backfill"), "Reading available history…");
   assert.equal(importProgressLabel("analysis"), "Running the full analysis…");
   assert.equal(importProgressLabel("done"), "Import ready");
+});
+
+test("hides diagnostic credential inputs on the normal route", () => {
+  assert.equal(sensorImportDiagnosticsVisible(""), false);
+  assert.equal(sensorImportDiagnosticsVisible("?debug=no"), false);
+  assert.equal(sensorImportDiagnosticsVisible("?debug=yesplease&other=1"), false);
+});
+
+test("reveals diagnostic credential inputs only for the exact debug query", () => {
+  assert.equal(sensorImportDiagnosticsVisible("?debug=yesplease"), true);
+  assert.equal(sensorImportDiagnosticsVisible("?debug=yespleasex"), false);
+  assert.equal(sensorImportDiagnosticsVisible("?x=1&debug=yesplease"), false);
+});
+
+test("uses the exact prominent local-processing privacy copy", () => {
+  assert.equal(privacyCopy, "Your data stays in this browser. Sensor readings and credentials are processed locally and are never uploaded or sent to a backend.");
 });
