@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   Crosshair,
   HoverCard,
@@ -57,7 +57,6 @@ function Trace({ values, height = 150 }: { values: (number | null)[]; height?: n
     >
       <HoverCard
         hover={hover}
-        containerRef={ref}
         title={hover ? slotTime(hover.index) : ""}
         rows={[
           {
@@ -128,7 +127,6 @@ function Streams({ state, event, mask }: { state: number[]; event: number[]; mas
     >
       <HoverCard
         hover={hover}
-        containerRef={ref}
         title={hover ? slotTime(hover.index) : ""}
         rows={
           !hover
@@ -181,16 +179,22 @@ export function ExampleAnalysisView({
     const i = w.leastTypical ? data.days.indexOf(w.leastTypical) : -1;
     return i >= 0 ? i : data.days.findIndex((d) => d.coverage >= 0.9);
   })();
-  const [selected, setSelected] = useState(initial < 0 ? 0 : initial);
-
-  // A tile on the front page links here with ?day=<index>. Read it after mount rather than
-  // through useSearchParams, which would force this statically-rendered page into a Suspense
-  // boundary for a query parameter that is purely a convenience.
-  useEffect(() => {
-    const q = new URLSearchParams(globalThis.location?.search ?? "").get("day");
-    const i = q == null ? Number.NaN : Number.parseInt(q, 10);
-    if (Number.isInteger(i) && i >= 0 && i < data.days.length) setSelected(i);
-  }, [data.days.length]);
+  // A tile on the front page links here with ?day=<index>. Read the location as an external
+  // snapshot so the query can seed state without synchronously setting state in an effect.
+  const search = useSyncExternalStore(
+    () => () => {},
+    () => globalThis.location?.search ?? "",
+    () => "",
+  );
+  const queryDay = new URLSearchParams(search).get("day");
+  const queryIndex = queryDay == null ? Number.NaN : Number.parseInt(queryDay, 10);
+  const [selected, setSelected] = useState(
+    Number.isInteger(queryIndex) && queryIndex >= 0 && queryIndex < data.days.length
+      ? queryIndex
+      : initial < 0
+        ? 0
+        : initial,
+  );
   const day = data.days[selected]!;
 
   const week = readWeek(data);

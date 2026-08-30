@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { CsvFormat } from "@/components/CsvFormat";
 import { DayChart } from "@/components/DayChart";
 import { ExampleAnalysisView } from "@/components/ExampleAnalysis";
@@ -39,7 +39,9 @@ function downloadAnalysis(analysis: ExampleAnalysis) {
 
 export function TryClient() {
   const [profileId, setProfileId] = useState(PROFILES[0]!.id);
-  const [readings, setReadings] = useState<Reading[] | null>(null);
+  const [readings, setReadings] = useState<Reading[]>(() =>
+    buildSampleDay(PROFILES[0]!, SAMPLE_DAY_START),
+  );
   const [dayStarts, setDayStarts] = useState<number[]>([SAMPLE_DAY_START]);
   const [sourceLabel, setSourceLabel] = useState<string>(PROFILES[0]!.label);
   const [status, setStatus] = useState<Status>("idle");
@@ -53,16 +55,16 @@ export function TryClient() {
 
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // A simulated day so the page is useful with no interaction and no file.
-  useEffect(() => {
-    const profile = PROFILES.find((p) => p.id === profileId) ?? PROFILES[0]!;
+  const selectProfile = useCallback((nextProfileId: string) => {
+    const profile = PROFILES.find((p) => p.id === nextProfileId) ?? PROFILES[0]!;
+    setProfileId(profile.id);
     setReadings(buildSampleDay(profile, SAMPLE_DAY_START));
     setDayStarts([SAMPLE_DAY_START]);
     setTrimmed(0);
     setSourceLabel(profile.label);
     setAnalysis(null);
     setError(null);
-  }, [profileId]);
+  }, []);
 
   const usable = useMemo(() => {
     if (!readings) return [];
@@ -194,7 +196,7 @@ export function TryClient() {
               <button
                 key={pr.id}
                 type="button"
-                onClick={() => setProfileId(pr.id)}
+                onClick={() => selectProfile(pr.id)}
                 className={`border px-4 py-2 text-sm transition ${
                   profileId === pr.id && sourceLabel === pr.label
                     ? "border-accent bg-accent-soft text-accent-ink"
