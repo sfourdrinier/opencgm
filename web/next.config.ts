@@ -1,3 +1,5 @@
+// web/next.config.ts
+
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
@@ -56,7 +58,36 @@ const config: NextConfig = {
   },
 
   async headers() {
-    return [];
+    const scriptSources = ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"];
+    if (process.env.NODE_ENV === "development") scriptSources.push("'unsafe-eval'");
+    // The explainer video is served from the generator's CDN rather than committed here, so
+    // media needs its own source list. Everything else stays same-origin: this widens media
+    // only, not the `default-src` fallback that would have carried scripts and frames with it.
+    const mediaSources = ["'self'", "https://assets.imagibooks.com"];
+    const contentSecurityPolicy = [
+      "default-src 'self'",
+      `script-src ${scriptSources.join(" ")}`,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      `media-src ${mediaSources.join(" ")}`,
+      "font-src 'self'",
+      "connect-src 'self'",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join("; ");
+    return [
+      {
+        source: "/:path*",
+        headers: [{ key: "Content-Security-Policy", value: contentSecurityPolicy }],
+      },
+      {
+        source: "/sensor/sensor-engine.abi1.wasm",
+        headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }],
+      },
+    ];
   },
 };
 

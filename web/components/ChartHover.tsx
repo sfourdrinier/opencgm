@@ -9,7 +9,14 @@ import { useCallback, useRef, useState } from "react";
 // so a finger on a phone works the same as a cursor; `touch-action: none` on the surface stops
 // the browser scrolling the page while someone is reading along a trace.
 
-export type HoverState = { index: number; clientX: number; clientY: number } | null;
+export type HoverState = {
+  index: number;
+  clientX: number;
+  clientY: number;
+  /** Measurements captured by the pointer event, so the card need not read a ref during render. */
+  containerWidth: number;
+  relativeX: number;
+} | null;
 
 export function useChartHover() {
   const ref = useRef<HTMLDivElement>(null);
@@ -24,7 +31,13 @@ export function useChartHover() {
     const right = r.left + r.width * 0.99;
     const frac = (e.clientX - left) / (right - left);
     const index = Math.round(Math.max(0, Math.min(1, frac)) * 287);
-    setHover({ index, clientX: e.clientX, clientY: r.top });
+    setHover({
+      index,
+      clientX: e.clientX,
+      clientY: r.top,
+      containerWidth: r.width,
+      relativeX: e.clientX - r.left,
+    });
   }, []);
 
   const onLeave = useCallback(() => setHover(null), []);
@@ -48,24 +61,24 @@ export function slotTime(index: number): string {
  */
 export function HoverCard({
   hover,
-  containerRef,
   rows,
   title,
 }: {
   hover: HoverState;
-  containerRef: React.RefObject<HTMLDivElement | null>;
   title: string;
   rows: { label: string; value: string; color?: string }[];
 }) {
-  if (!hover || !containerRef.current) return null;
-  const r = containerRef.current.getBoundingClientRect();
-  const rel = hover.clientX - r.left;
-  const flip = rel > r.width * 0.66;
+  if (!hover) return null;
+  const flip = hover.relativeX > hover.containerWidth * 0.66;
 
   return (
     <div
       className="pointer-events-none absolute top-2 z-10 min-w-[8.5rem] border border-rule-strong bg-paper-raised px-3 py-2 shadow-sm"
-      style={flip ? { right: r.width - rel + 10 } : { left: rel + 10 }}
+      style={
+        flip
+          ? { right: hover.containerWidth - hover.relativeX + 10 }
+          : { left: hover.relativeX + 10 }
+      }
     >
       <div className="tnum text-xs font-medium text-ink">{title}</div>
       <div className="mt-1 space-y-0.5">

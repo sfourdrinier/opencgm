@@ -1,0 +1,23 @@
+{
+  "abiVersion": 1,
+  "filename": "sensor-engine.abi1.wasm",
+  "byteLength": 109182,
+  "sha256": "d90fbcb5081b57e79c926d5ecade6e77e3bbe85e6e72c5d593b5c59616622e4d",
+  "exports": [
+    "a",
+    "d",
+    "memory",
+    "x"
+  ],
+  "maximumInputBytes": 1048576,
+  "maximumOutputBytes": 1048576,
+  "toolchain": {
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "wasmOpt": "wasm-opt version 132 (version_132)",
+    "wasmTools": "wasm-tools 1.239.0"
+  },
+  "licenses": [
+    "MIT OR Apache-2.0"
+  ]
+}

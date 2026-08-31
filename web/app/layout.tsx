@@ -85,9 +85,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <a href="/paper" className="text-accent hover:underline">
                     Paper
                   </a>
-                  <a href={LINKS.decisions} className="text-accent hover:underline">
-                    Decisions
-                  </a>
                   <a href={LINKS.reproduce} className="text-accent hover:underline">
                     Reproduce
                   </a>

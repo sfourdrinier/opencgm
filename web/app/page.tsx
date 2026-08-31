@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Callout, ScoreAxis, ScoreBar, Stat } from "@/components/Figures";
 import { StreamsThumb, WeekAtAGlance } from "@/components/ExampleCharts";
+import { ExplainerVideo } from "@/components/ExplainerVideo";
 import { GlossaryList, Term } from "@/components/Glossary";
 import { loadExample } from "@/lib/example-data";
 import { AMBIGUITY, CORPUS, LINKS, MODEL, QUESTIONS, RESULTS } from "@/lib/facts";
@@ -33,35 +34,50 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-6xl px-6">
       <section className="border-b border-rule py-12 md:py-16">
-        <p className="text-sm uppercase tracking-widest text-accent">
-          Open reconstruction · public data only
-        </p>
-        <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight tracking-tight text-ink md:text-5xl">
-          Two glucose days can share every summary number and be nothing alike.
-        </h1>
-        <p className="lede mt-6 max-w-3xl">
-          Your CGM app reduces each day to an average and a time-in-range. This model reads the
-          shape of the whole day instead — 2 MB, running in your browser tab, with your readings
-          never uploaded. It is an open reconstruction of Google&rsquo;s GlucoFM, a foundation
-          model published as a paper with no code and no weights.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/try"
-            className="bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-ink"
-          >
-            Try it on a sample day
-          </Link>
-          <Link
-            href="/paper"
-            className="border border-rule-strong px-5 py-2.5 text-sm font-medium text-ink hover:border-accent hover:text-accent"
-          >
-            Read the paper
-          </Link>
-          <p className="mt-1 w-full text-sm text-ink-soft">
-            No file needed — sample days are built in. Or drop in your own Dexcom or Libre
-            export; it never leaves your browser.
-          </p>
+        {/* Two columns from md up. The explainer is portrait, so it sits happily beside the
+            copy at half width instead of forcing a full-bleed row; below md it stacks under
+            the buttons and is capped so it never runs taller than a phone screen. */}
+        <div className="grid items-center gap-10 md:grid-cols-[1.25fr_auto] md:gap-12">
+          <div>
+            <p className="text-sm uppercase tracking-widest text-accent">
+              Open reconstruction · public data only
+            </p>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-ink md:text-5xl">
+              Two glucose days can share every summary number and be nothing alike.
+            </h1>
+            <p className="lede mt-6">
+              Your CGM app reduces each day to an average and a time-in-range. This model reads
+              the shape of the whole day instead — 2 MB, running in your browser tab, with your
+              readings never uploaded. It is an open reconstruction of Google&rsquo;s GlucoFM, a
+              foundation model published as a paper with no code and no weights.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/try"
+                className="bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-ink"
+              >
+                Try it on a sample day
+              </Link>
+              <Link
+                href="/paper"
+                className="border border-rule-strong px-5 py-2.5 text-sm font-medium text-ink hover:border-accent hover:text-accent"
+              >
+                Read the paper
+              </Link>
+              <p className="mt-1 w-full text-sm text-ink-soft">
+                No file needed — sample days are built in. Or drop in your own Dexcom or Libre
+                export; it never leaves your browser.
+              </p>
+            </div>
+          </div>
+
+          <ExplainerVideo
+            src={LINKS.explainer}
+            poster="/explainer-poster.webp"
+            durationLabel="1:36"
+            title="the OpenCGM explainer"
+            className="mx-auto aspect-[9/16] w-full max-w-[300px] sm:max-w-[340px]"
+          />
         </div>
       </section>
 
@@ -374,11 +390,7 @@ export default function Home() {
             repository, and a test suite re-derives the headline numbers from the model and the
             corpus so the documentation cannot drift from the code. The config loader refuses
             to run unless each of the {AMBIGUITY.inferredForks} under-specified options carries
-            an evidence tag, and every one is a dated entry in{" "}
-            <a href={LINKS.decisions} className="text-accent hover:underline">
-              DECISIONS.md
-            </a>
-            . Runs that failed are still in the repository.
+            an evidence tag. Runs that failed are still in the repository.
           </p>
         </Callout>
       </section>

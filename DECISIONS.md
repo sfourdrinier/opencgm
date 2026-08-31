@@ -17,7 +17,7 @@ should have an entry here.
 
 ---
 
-## D001 — Raw data lives outside the repository · DECIDED 2026-08-27
+## D001 — Raw data lives outside the repository · DECIDED
 
 `PROPOSED_EXTENSION` (project infrastructure, not method)
 
@@ -30,7 +30,7 @@ requires that raw data never be committed. Follows the workspace's inventory/hot
 
 ---
 
-## D002 — Restrictive licences make a source evaluation-only, not excluded · DECIDED 2026-08-27
+## D002 — Restrictive licences make a source evaluation-only, not excluded · DECIDED
 
 `SOURCE_VERIFIED` · full reasoning in `bundle/BLUEPRINT_AMENDMENTS.md` A4
 
@@ -52,7 +52,7 @@ Affects: `uchtt1dm`, `cgmacros`, `glucofm_bench`, and `d1namo` pending SA review
 
 ---
 
-## D003 — Stanford CGM comes from the companion repo, pinned by commit · DECIDED 2026-08-27
+## D003 — Stanford CGM comes from the companion repo, pinned by commit · DECIDED
 
 `SOURCE_VERIFIED` · `bundle/BLUEPRINT_AMENDMENTS.md` A2
 
@@ -68,7 +68,7 @@ Keep `data_meta.csv` from the cgmdb page for downstream labels (HbA1c, SSPG, DI)
 
 ---
 
-## D004 — Grid binning rule: **nearest, for all five datasets** · DECIDED 2026-08-27
+## D004 — Grid binning rule: **nearest, for all five datasets** · DECIDED
 
 `INFERRED_RECONSTRUCTION` · blueprint §9.3, config `alignment.binning`
 Evidence: `reports/binning_audit.md`. Tie rule: round half **away from zero**, never
@@ -115,7 +115,7 @@ must be characterised in PR 2 before it is averaged away. Tracked as Q5.
 
 ---
 
-## D005 — Coverage ratio = **fraction of legal starts** (Candidate A) · DECIDED 2026-08-27
+## D005 — Coverage ratio = **fraction of legal starts** (Candidate A) · DECIDED
 
 `INFERRED_RECONSTRUCTION` · blueprint §9.4 · evidence `reports/window_sampler.md`
 
@@ -160,7 +160,7 @@ Candidate B is retained as ablation T2.2. Escalated as authors' question §27 #2
 
 ---
 
-## D006 — Python 3.12 · DECIDED 2026-08-27
+## D006 — Python 3.12 · DECIDED
 
 `PROPOSED_EXTENSION`
 
@@ -169,7 +169,7 @@ System Python is 3.10 and is not used.
 
 ---
 
-## D007 — Stanford duplicate rows: drop exact, average conflicting · DECIDED 2026-08-27
+## D007 — Stanford duplicate rows: drop exact, average conflicting · DECIDED
 
 `SOURCE_VERIFIED` (the duplication is a property of the source file) ·
 `INFERRED_RECONSTRUCTION` (the handling rule) · closes Q5
@@ -212,7 +212,7 @@ close in time but not identical are left to the binning rule.
 
 ## D008 — Partial windows rescue 9.9% of discarded data · **PROPOSED_EXTENSION**, public-plus only
 
-`PROPOSED_EXTENSION` · not in the strict reproduction · raised by Stephane 2026-08-27
+`PROPOSED_EXTENSION` · not in the strict reproduction · raised by Stephane
 
 ### The observation
 
@@ -277,7 +277,7 @@ folded into the reproduction number.
 
 ---
 
-## D009 — sqrt(0) gradient guard, and the overfit gate criterion · DECIDED 2026-08-27
+## D009 — sqrt(0) gradient guard, and the overfit gate criterion · DECIDED
 
 `INFERRED_RECONSTRUCTION` (numerical guard, no equation changed) · closes the PR 8 bring-up gate
 
@@ -325,7 +325,7 @@ something data-dependent rather than sitting at its initial value, which §12.4 
 
 ---
 
-## D010 — float32, not mixed precision (2026-08-27)
+## D010 — float32, not mixed precision
 
 **Status:** decided. `INFERRED_RECONSTRUCTION` — §17.1 does not name a precision.
 
@@ -345,7 +345,7 @@ float32 is also the conservative choice for a reproduction: it removes a source 
 divergence from the headline numbers. The AMP path stays in `TrainConfig` behind `--amp` for
 larger configurations, but it is off by default.
 
-## D011 — torch.compile rejected for the headline runs (2026-08-27)
+## D011 — torch.compile rejected for the headline runs
 
 **Status:** decided. Rejected.
 
@@ -365,7 +365,7 @@ A 1.44x speedup is not worth it: concurrency (D012) gives a larger reduction in 
 changing nothing about the arithmetic. Reconsider only if a future configuration is genuinely
 compute-bound, and only with TF32 explicitly disabled and re-measured.
 
-## D012 — the five seeds train concurrently on one GPU (2026-08-27)
+## D012 — the five seeds train concurrently on one GPU
 
 **Status:** decided. `PROPOSED_EXTENSION` to the run plan; affects wall-clock only, not results.
 
@@ -388,7 +388,7 @@ alone, with its own RNG streams and its own batch order derived from `(seed, epo
 concurrently-trained seed is bit-identical to a serially-trained one; only the wall-clock differs.
 Contrast D011, which was rejected precisely because it would not have been.
 
-## D013 — deterministic CUDA kernels are on by default (2026-08-27)
+## D013 — deterministic CUDA kernels are on by default
 
 **Status:** decided. `PROPOSED_EXTENSION` — the paper makes no reproducibility claim at this level.
 
@@ -421,7 +421,7 @@ On by default; `--nondeterministic` remains for exploratory work. KR2.6 is met w
 
 Both now have regression tests, including a control asserting dropout does change the loss.
 
-## D014 — CGMacros three-class diabetes risk uses standard HbA1c bands (2026-08-27)
+## D014 — CGMacros three-class diabetes risk uses standard HbA1c bands
 
 **Status:** decided. `INFERRED_RECONSTRUCTION`.
 
@@ -438,7 +438,7 @@ evidence the cut points are the intended ones, since a wrong upper threshold wou
 Tagged `INFERRED_RECONSTRUCTION`, not `PAPER_EXACT`. It is the only one of the fourteen tasks
 that required a threshold the blueprint does not state.
 
-## D015 — undefined fold metrics are reported as NaN, never imputed (2026-08-27)
+## D015 — undefined fold metrics are reported as NaN, never imputed
 
 **Status:** decided. `PROPOSED_EXTENSION` — §19.4 does not say what to do here.
 
@@ -458,7 +458,7 @@ These two tasks are reported with their subject counts beside them. A confidence
 on 8 positives is wide, and the write-up must say so rather than let it sit in a table looking
 like the others.
 
-## D016 — CGMacros observations are recovered, not resampled (2026-08-27)
+## D016 — CGMacros observations are recovered, not resampled
 
 **Status:** decided. `SOURCE_VERIFIED` — the recovery is verified against the source file itself.
 
@@ -488,7 +488,7 @@ an under-count is conservative — it lowers a window's density weight rather th
 Sensors are kept in separate sessions and evaluated separately at native cadence, per §19.10,
 and paired by subject only at split time, per §19.3.
 
-## D017 — Stanford labels come from the CGM-contemporaneous visit (2026-08-27)
+## D017 — Stanford labels come from the CGM-contemporaneous visit
 
 **Status:** decided. `SOURCE_VERIFIED`.
 
@@ -521,7 +521,7 @@ for any downstream task. That is a coverage limitation and belongs beside the St
 A guard in the evaluation driver now raises on any duplicated label index rather than proceeding,
 so this class of error cannot recur silently in another source.
 
-## D018 — target LayerNorm is available, off by default (2026-08-27)
+## D018 — target LayerNorm is available, off by default
 
 **Status:** decided. `PROPOSED_EXTENSION`, disabled in the strict path.
 
@@ -538,7 +538,7 @@ and it deepens the covariance rank collapse rather than relieving it. It stays i
 labelled option because the negative result is worth reporting, and it stays off by default
 because the strict reproduction must be exactly what the blueprint specifies.
 
-## D019 — patch statistics are computed from the raw aligned sequence, not the normalised one (2026-08-27)
+## D019 — patch statistics are computed from the raw aligned sequence, not the normalised one
 
 **Status:** decided. `PAPER_EXACT`. Default changed; the previous behaviour survives as an ablation.
 
@@ -598,7 +598,7 @@ all three properties, including a control asserting that the flag really does ch
 sentence. It is now known to be `PAPER_EXACT` rather than a matter of taste, and needs its own
 decision and test.
 
-## D020 — an empty patch emits nothing, not a learned bias (2026-08-27)
+## D020 — an empty patch emits nothing, not a learned bias
 
 **Status:** decided. `PAPER_EXACT`. Default changed; the previous behaviour survives as an ablation.
 
@@ -644,7 +644,7 @@ that base rate is itself worth remembering.
 whose config predates the flag is re-read with the behaviour it was trained under, and a resume
 that would change it refuses. Verified against a live checkpoint from the running sweep.
 
-## D021 — the CGM-JEPA comparator is ported from the authors' code, not inferred (2026-08-28)
+## D021 — the CGM-JEPA comparator is ported from the authors' code, not inferred
 
 **Tag: SOURCE_VERIFIED** (superseding an `INFERRED_RECONSTRUCTION` draft written the same day).
 
@@ -705,7 +705,7 @@ individual tasks. Reproducing vanilla CGM-JEPA reproduces the headline; it does 
 and is deferred, not dismissed. Any claim we publish must say "over CGM-JEPA", never "over the best
 CGM-specific foundation model", unless X-CGM-JEPA is also run.
 
-## D022 — the comparator sees raw mg/dL, because its authors' default does (2026-08-28)
+## D022 — the comparator sees raw mg/dL, because its authors' default does
 
 **Tag: SOURCE_VERIFIED**, resolving a contradiction inside the GlucoFM paper.
 
@@ -737,7 +737,7 @@ The `interpolate_dense` path is therefore used deliberately here, and only here.
 
 ---
 
-## D023 — Lane D is a teacher-student pilot, not a probe-on-encoder · `PROPOSED_EXTENSION` (2026-08-29)
+## D023 — Lane D is a teacher-student pilot, not a probe-on-encoder · `PROPOSED_EXTENSION`
 
 The PPG+CGM paired dataset on disk (`ppg_cgm_paired_zenodo_20577959`, 5 participants, 3327 BVP
 segments at 64 Hz, paired with CGM in mmol/L at 15-min cadence, CC-BY-4.0) is too small to
@@ -827,7 +827,7 @@ corpus percentage.
 
 ---
 
-## D024 — teacher is the strict ep40 checkpoint, not ep120 · `INFERRED_RECONSTRUCTION` (2026-08-29)
+## D024 — teacher is the strict ep40 checkpoint, not ep120 · `INFERRED_RECONSTRUCTION`
 
 The pilot teacher (D023) is the strict-pretrain ep40 checkpoint
 (`runs_5090/rawstats120/seed17/ckpt_ep040.pt`), not ep120.
@@ -850,7 +850,7 @@ load of the existing ep40 checkpoint.
 
 ## D025 — The heads bundle carries its own licence, one step stricter than the encoder
 
-**Date:** 2026-08-30 · **Tag:** `SOURCE_VERIFIED` (licence terms read from the registry and the
+**Tag:** `SOURCE_VERIFIED` (licence terms read from the registry and the
 CC 4.0 deed) · **Supersedes:** the first version of `scripts/publish_web_assets.py`, which
 withheld heads instead of labelling them.
 
