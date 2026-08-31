@@ -8,6 +8,7 @@ import {
   importProgressLabel,
   privacyCopy,
   pairingCodeGuidance,
+  pairingCodeRequiredCopy,
   sensorImportCredentialCallbacks,
   sensorImportBluetoothOptions,
   sensorImportDiagnosticsVisible,
@@ -75,6 +76,7 @@ test("keeps non-Linux Chrome recovery guidance generic", () => {
 });
 
 test("requires exactly four ASCII digits for a first pairing", () => {
+  assert.equal(pairingCodeRequiredCopy, "— Need pairing code");
   assert.equal(isValidPairingCode("1234"), true);
   assert.equal(isValidPairingCode(""), false);
   assert.equal(isValidPairingCode("123"), false);
