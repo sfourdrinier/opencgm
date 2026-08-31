@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { BleError } from "unified-ble-manager";
 import type { SensorImportResult } from "../lib/sensor/contracts";
 import {
   browserCapabilitySnapshot,
@@ -16,6 +17,7 @@ import {
   sensorImportWaitingCopy,
   sensorSelectedCopy,
   sensorImportError,
+  sensorImportDiagnostic,
 } from "./SensorImportClient";
 
 const imported: SensorImportResult = {
@@ -109,6 +111,22 @@ test("turns a connection deadline into actionable retry guidance", () => {
     sensorImportError(new Error("operation timed out")),
     "The sensor connection timed out. Keep the sensor nearby, stop any competing phone connection, and retry during its next Bluetooth window.",
   );
+});
+
+test("preserves structured Web Bluetooth connection evidence for users and support", () => {
+  const error = new BleError("connection.failed", "connection", "web-connection.connect", {
+    platform: {
+      domain: "web-bluetooth",
+      code: "NetworkError",
+      safeMessage: "The Web Bluetooth operation failed.",
+      metadata: { browserErrorName: "NetworkError" },
+    },
+  });
+  assert.equal(
+    sensorImportError(error),
+    "Chrome found the sensor but could not open its Bluetooth connection. Stop any competing phone connection, wait for the next sensor window, and retry.",
+  );
+  assert.equal(sensorImportDiagnostic(error), "connection.failed · web-connection.connect · NetworkError");
 });
 
 test("uses the proven Dexcom advertisement and GATT UUIDs", () => {

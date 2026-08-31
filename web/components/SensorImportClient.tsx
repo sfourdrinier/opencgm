@@ -121,6 +121,18 @@ export function importProgressLabel(stage: ImportStage | "loading"): string {
 }
 
 export function sensorImportError(error: unknown): string {
+  const bleError = findBleError(error);
+  if (bleError) {
+    switch (bleError.code) {
+      case "operation.timed-out": return "The sensor connection timed out. Keep the sensor nearby, stop any competing phone connection, and retry during its next Bluetooth window.";
+      case "connection.failed": return "Chrome found the sensor but could not open its Bluetooth connection. Stop any competing phone connection, wait for the next sensor window, and retry.";
+      case "permission.denied":
+      case "platform.security": return "Chrome or the operating system denied Bluetooth access. Check this site's Bluetooth permission and retry.";
+      case "gatt.not-found": return "Chrome connected, but the expected Dexcom G7 Bluetooth service was not available on that device.";
+      case "operation.disconnected": return "The sensor disconnected before the import completed. Any readings already received remain saved; retry during the next sensor window.";
+      case "chooser.cancelled": return "The Bluetooth chooser closed before a sensor was selected.";
+    }
+  }
   const message = error instanceof Error ? error.message.toLowerCase() : "";
   if (message.includes("activation")) return "Connect must begin from the Connect button.";
   if (message.includes("choose sensor")) return "Choose a sensor to reconnect.";
@@ -129,6 +141,40 @@ export function sensorImportError(error: unknown): string {
   if (message.includes("cancel")) return "The connection was cancelled before history was read.";
   if (message.includes("pair")) return "The sensor needs pairing information.";
   return "The local sensor connection did not complete. Check that the sensor is nearby, then try again.";
+}
+
+export function sensorImportDiagnostic(error: unknown): string | null {
+  const bleError = findBleError(error);
+  if (!bleError) return error instanceof Error ? `${error.name} · ${error.message}` : null;
+  return [bleError.code, bleError.operation, bleError.browserErrorName]
+    .filter((value): value is string => value !== null)
+    .join(" · ");
+}
+
+type SensorBleError = {
+  readonly code: string;
+  readonly operation: string;
+  readonly browserErrorName: string | null;
+};
+
+function findBleError(error: unknown): SensorBleError | null {
+  if (typeof error === "object" && error !== null) {
+    const code = Reflect.get(error, "code");
+    const operation = Reflect.get(error, "operation");
+    if (typeof code === "string" && typeof operation === "string") {
+      const platform = Reflect.get(error, "platform");
+      const metadata = typeof platform === "object" && platform !== null ? Reflect.get(platform, "metadata") : null;
+      const browserErrorName = typeof metadata === "object" && metadata !== null ? Reflect.get(metadata, "browserErrorName") : null;
+      return { code, operation, browserErrorName: typeof browserErrorName === "string" ? browserErrorName : null };
+    }
+  }
+  if (error instanceof AggregateError) {
+    for (const nested of error.errors) {
+      const found = findBleError(nested);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 function download(name: string, body: string, type: string): void {
@@ -161,6 +207,7 @@ export function SensorImportClient({
   const [analysis, setAnalysis] = useState<Awaited<ReturnType<typeof runReadingsAnalysis>>["analysis"] | null>(null);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [errorDiagnostic, setErrorDiagnostic] = useState<string | null>(null);
   const controllerRef = useRef<SensorController | null>(null);
   const vaultRef = useRef<CredentialVault | null>(null);
   const archiveRef = useRef<ReadingArchive | null>(null);
@@ -213,6 +260,7 @@ export function SensorImportClient({
       return;
     }
     setError(null);
+    setErrorDiagnostic(null);
     cancelledRef.current = false;
     setAnalysis(null);
     setResult(null);
@@ -272,6 +320,7 @@ export function SensorImportClient({
       if (!mountedRef.current || cancelledRef.current) return;
       setStage("error");
       setError(sensorImportError(caught));
+      setErrorDiagnostic(sensorImportDiagnostic(caught));
       setProgress(importProgressLabel("error"));
     }
   }, [createController, pairingCode, remember, stage, support, sensorName]);
@@ -337,7 +386,7 @@ export function SensorImportClient({
           {result ? <button type="button" onClick={() => void forget()} className="text-sm text-ink-faint underline decoration-dotted underline-offset-4 hover:text-accent">Forget local key</button> : null}
         </div>
         <p className="mt-4 text-sm text-ink-soft" role="status" aria-live="polite">{progress || importProgressLabel(stage)}</p>
-        {error ? <div className="mt-3 border border-low/40 bg-low/5 px-4 py-3 text-sm text-ink-soft" role="alert">{error}</div> : null}
+        {error ? <div className="mt-3 border border-low/40 bg-low/5 px-4 py-3 text-sm text-ink-soft" role="alert"><p>{error}</p>{errorDiagnostic ? <p className="mt-2 font-mono text-xs text-ink-faint">Technical detail: {errorDiagnostic}</p> : null}</div> : null}
       </section>
 
       {coverage && result ? <SensorImportCoverage summary={coverage} /> : null}
