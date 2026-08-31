@@ -298,7 +298,7 @@ export function SensorImportClient({
 
   const busy = stage === "connecting" || stage === "backfill" || stage === "analysis";
   const coverage = result ? sensorImportCoverage(result) : null;
-  const exportName = archivedReadings.at(-1)?.sensorId || result?.metadata.sensorId || "sensor-import";
+  const exportName = archivedReadings.at(-1)?.sensorId || result?.metadata.sensorId || "dexcom-import";
   const latestArchived = [...archivedReadings].reverse().find(reading => reading.reliable && reading.mgdl !== null) ?? archivedReadings.at(-1);
 
   return (

@@ -90,13 +90,13 @@ traffic, move the bucket to a KV store or put a WAF in front. It is a speed bump
 
 Nothing is required. `NEXT_DEV_ORIGINS` is development-only and should not be set in Vercel.
 
-## Browser sensor import
+## Browser Dexcom import
 
 The experimental importer is available by direct URL at
-<https://opencgm.vercel.app/sensor-import>. It is intentionally not linked from
+<https://opencgm.vercel.app/dexcom-import>. It is intentionally not linked from
 navigation, the home page, the try page, or the sitemap while hardware proof is
 being completed. For local development, use
-`http://localhost:3000/sensor-import` (or the port printed by Next).
+`http://localhost:3000/dexcom-import` (or the port printed by Next).
 
 The production URL is a secure context. The localhost HTTP exception is only for
 development; other HTTP origins must not be documented as supported. The

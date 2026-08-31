@@ -1,9 +1,9 @@
-<!-- web/app/sensor-import/README.md -->
+<!-- web/app/dexcom-import/README.md -->
 
-# Browser sensor import
+# Browser Dexcom import
 
 This is the operator and support note for the direct browser importer at
-<https://opencgm.vercel.app/sensor-import>. The route is intentionally reachable
+<https://opencgm.vercel.app/dexcom-import>. The route is intentionally reachable
 by direct URL while hardware proof is in progress; it is not linked from the
 site navigation, home page, try page, or sitemap.
 
