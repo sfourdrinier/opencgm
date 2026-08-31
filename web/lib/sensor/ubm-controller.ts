@@ -27,6 +27,12 @@ const DEFAULT_AUTHORIZED_RETRY_DELAY_MS = 15_000;
 const DEFAULT_AUTHORIZED_RETRY_ATTEMPTS = 25;
 const DEFAULT_CONNECT_TIMEOUT_MS = 20_000;
 
+function isUnsettledWebConnectTimeout(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  return Reflect.get(error, "code") === "operation.timed-out"
+    && Reflect.get(error, "operation") === "web-connection.connect";
+}
+
 export function getWebSensorSupport(input: { readonly secureContext: boolean; readonly bluetooth: boolean; readonly origin?: string }): WebSensorSupport {
   const localhostException = input.origin !== undefined && /^http:\/\/localhost(?::\d+)?$/u.test(input.origin);
   if (!input.secureContext && !localhostException) return { state: "unsupported", reason: "secure-context-required" };
@@ -272,6 +278,7 @@ export function createSensorController(
           terminal.reject(error);
           warnings.push(error instanceof Error ? error.message : "sensor operation failed");
           if (connection !== null) await disconnectOnce(connection);
+          if (connection === null && isUnsettledWebConnectTimeout(error)) throw error;
           if (credentialPersistenceFailedForCurrentRun || readingPersistenceFailedForCurrentRun || (attempt === maxAttempts && recordsForCurrentRun.length === 0)) throw error;
         } finally {
           generation.value += 1;

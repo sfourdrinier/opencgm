@@ -100,7 +100,7 @@ test("uses truthful waiting copy for intermittent sensor availability", () => {
 });
 
 test("explains that a selected sensor is connecting instead of asking for another prompt", () => {
-  assert.equal(sensorSelectedCopy, "Sensor selected. Connecting, authenticating, and reading available history…");
+  assert.equal(sensorSelectedCopy, "Sensor selected. Opening its Bluetooth connection for up to 20 seconds…");
 });
 
 test("explains the browser OS-bond boundary without claiming first-pair success", () => {

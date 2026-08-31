@@ -36,7 +36,7 @@ export const privacyCopy = "Your data stays in this browser. Sensor readings and
 export const pairingCodeGuidance = "Enter the four ASCII digits from the sensor applicator or pairing material.";
 export const pairingCodeRequiredCopy = "— Need pairing code";
 export const sensorImportWaitingCopy = "A sensor may become available briefly about every five minutes. Keep this page open; discovery can take several minutes. A sleeping or unavailable remembered sensor remains in a waiting state.";
-export const sensorSelectedCopy = "Sensor selected. Connecting, authenticating, and reading available history…";
+export const sensorSelectedCopy = "Sensor selected. Opening its Bluetooth connection for up to 20 seconds…";
 
 export function isValidPairingCode(value: string): boolean {
   return /^[0-9]{4}$/u.test(value);

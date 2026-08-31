@@ -101,6 +101,37 @@ test("passes a bounded connection deadline through the manager contract", async 
   assert.deepEqual(connectOptions, { timeoutMs: 42 });
 });
 
+test("preserves a timed-out pending connection instead of masking it with an unsafe retry", async () => {
+  const timedOut = { code: "operation.timed-out", operation: "web-connection.connect" };
+  let connects = 0;
+  const deps: SensorControllerDependencies = {
+    createManager: async () => ({
+      choose: async () => ({ id: "peer" }),
+      connect: async () => {
+        connects += 1;
+        if (connects === 1) throw timedOut;
+        throw { code: "connection.already-owned", operation: "web-connection.connect" };
+      },
+      destroy: async () => undefined,
+    }),
+    createEngine: async () => ({ push: async () => [], stop: async () => undefined }),
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 2, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  let caught: unknown;
+  try {
+    await controller.importSensor({ sensorName: "sensor", userActivation: true });
+  } catch (error) {
+    caught = error;
+  }
+
+  assert.equal(caught, timedOut);
+  assert.equal(connects, 1);
+});
+
 test("truthfully rejects chooser use outside transient activation", async () => {
   const fake = fakeManager();
   const deps: SensorControllerDependencies = {
