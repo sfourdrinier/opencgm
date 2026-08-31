@@ -50,7 +50,7 @@ test("ships exactly one audited ABI 1 sensor artifact and matching manifest", as
   });
 });
 
-test("keeps the provisional ABI 1 asset revalidated and serves it under a first-party WASM CSP", async () => {
+test("keeps the production ABI 1 asset revalidated and serves it under a first-party WASM CSP", async () => {
   const config = await readFile(resolve(import.meta.dirname, "../../next.config.ts"), "utf8");
   const vercel = await readFile(resolve(import.meta.dirname, "../../vercel.json"), "utf8");
   assert.match(config, /source: "\/sensor\/sensor-engine\.abi1\.wasm"/);

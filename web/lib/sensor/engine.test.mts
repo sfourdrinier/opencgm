@@ -95,9 +95,9 @@ test("dispatches start and stop through the checked-in ABI 1 artifact", async ()
 
   const engine = await loadSensorEngine(deps);
   assert.deepEqual(await engine.push({ kind: "start", nowMs: 1, sensorName: "sensor", credential: null, pairingCode: null, certificateBundle: null }), [
-    { kind: "failure", category: "protocol-invalid" },
+    { kind: "subscribe", actionId: 1, channel: "authentication" },
   ]);
-  assert.deepEqual(await engine.push({ kind: "stop" }), [{ kind: "failure", category: "protocol-invalid" }]);
+  assert.deepEqual(await engine.push({ kind: "stop" }), [{ kind: "failure", category: "cancelled" }]);
   assert.equal(freed.length, 4);
   assert.ok(freed.every(([pointer, length]) => pointer > 0 && length > 0));
 });

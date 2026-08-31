@@ -1,8 +1,8 @@
 {
   "abiVersion": 1,
   "filename": "sensor-engine.abi1.wasm",
-  "byteLength": 21651,
-  "sha256": "7507259e1a4bd7c074ee14d4575e6beb398365e35773678d1e6517858bdc4571",
+  "byteLength": 108518,
+  "sha256": "9d24884eb5aa88ea2fa20e0edaac22a2de4ad27a52699b6939aeeefde09a99c2",
   "exports": [
     "a",
     "d",
