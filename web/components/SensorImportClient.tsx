@@ -31,22 +31,29 @@ export type SensorImportClientProps = {
 type ImportStage = "idle" | "connecting" | "backfill" | "analysis" | "done" | "error" | "cancelled";
 
 export const privacyCopy = "Your data stays in this browser. Sensor readings and credentials are processed locally and are never uploaded or sent to a backend.";
+export const pairingCodeGuidance = "Enter the four ASCII digits from the sensor applicator or pairing material.";
+export const sensorImportWaitingCopy = "A sensor may become available briefly about every five minutes. Keep this page open; discovery can take several minutes. A sleeping or unavailable remembered sensor remains in a waiting state.";
+
+export function isValidPairingCode(value: string): boolean {
+  return /^[0-9]{4}$/u.test(value);
+}
 
 export function sensorImportDiagnosticsVisible(search: string): boolean {
   return search === "?debug=yesplease";
 }
 
-const DEFAULT_SENSOR_OPTIONS = {
-  serviceUuid: "0000f808-0000-1000-8000-00805f9b34fb",
+export const sensorImportBluetoothOptions = {
+  chooserServiceUuid: "0000febc-0000-1000-8000-00805f9b34fb",
+  serviceUuid: "f8083532-849e-531c-c594-30f1f86a4ea5",
   channels: {
-    authentication: "0000f809-0000-1000-8000-00805f9b34fb",
-    control: "0000f80a-0000-1000-8000-00805f9b34fb",
-    backfill: "0000f80b-0000-1000-8000-00805f9b34fb",
-    "extra-data": "0000f80c-0000-1000-8000-00805f9b34fb",
+    authentication: "f8083535-849e-531c-c594-30f1f86a4ea5",
+    control: "f8083534-849e-531c-c594-30f1f86a4ea5",
+    backfill: "f8083536-849e-531c-c594-30f1f86a4ea5",
+    "extra-data": "f8083538-849e-531c-c594-30f1f86a4ea5",
   },
 };
 
-const defaultCreateController = (credentials?: SensorCredentialCallbacks) => createDefaultSensorController(DEFAULT_SENSOR_OPTIONS, credentials);
+const defaultCreateController = (credentials?: SensorCredentialCallbacks) => createDefaultSensorController(sensorImportBluetoothOptions, credentials);
 const defaultCreateVault = () => CredentialVault.createPersistentAsync();
 
 export function sensorImportCredentialCallbacks(
@@ -109,6 +116,8 @@ export function importProgressLabel(stage: ImportStage | "loading"): string {
 export function sensorImportError(error: unknown): string {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
   if (message.includes("activation")) return "Connect must begin from the Connect button.";
+  if (message.includes("choose sensor")) return "Choose a sensor to reconnect.";
+  if (message.includes("os pairing")) return "Chrome cannot finish a new operating-system Bluetooth bond here. Use a browser-authorized sensor with prepared pairing information, then retry.";
   if (message.includes("cancel")) return "The connection was cancelled before history was read.";
   if (message.includes("pair")) return "The sensor needs pairing information.";
   return "The local sensor connection did not complete. Check that the sensor is nearby, then try again.";
@@ -134,6 +143,8 @@ export function SensorImportClient({
   const [stage, setStage] = useState<ImportStage>("idle");
   const [sensorName, setSensorName] = useState("Dexcom G7");
   const [pairingCode, setPairingCode] = useState("");
+  const [vaultReady, setVaultReady] = useState(false);
+  const [authorizedPeerFound, setAuthorizedPeerFound] = useState(false);
   const [remember, setRemember] = useState(false);
   const [result, setResult] = useState<SensorImportResult | null>(null);
   const [analysis, setAnalysis] = useState<Awaited<ReturnType<typeof runReadingsAnalysis>>["analysis"] | null>(null);
@@ -144,6 +155,7 @@ export function SensorImportClient({
   const credentialRef = useRef<Uint8Array | null>(null);
   const certificateRef = useRef<Uint8Array | null>(null);
   const selectedPeerIdRef = useRef<string | null>(null);
+  const autoReconnectStartedRef = useRef(false);
   const cancelledRef = useRef(false);
   const mountedRef = useRef(true);
 
@@ -155,8 +167,11 @@ export function SensorImportClient({
   useEffect(() => {
     mountedRef.current = true;
     void createVault().then((vault) => {
-      if (mountedRef.current) vaultRef.current = vault;
-    }).catch(() => undefined);
+      if (mountedRef.current) {
+        vaultRef.current = vault;
+        setVaultReady(true);
+      }
+    }).catch(() => { if (mountedRef.current) setVaultReady(true); });
     return () => {
       mountedRef.current = false;
       const controller = controllerRef.current;
@@ -171,28 +186,34 @@ export function SensorImportClient({
     if (controller) await controller.stop();
   }, []);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (selection: "chooser" | "authorized" = "chooser") => {
     if (support?.state !== "supported" || stage === "connecting" || stage === "backfill" || stage === "analysis") return;
+    if (selection === "chooser" && !isValidPairingCode(pairingCode)) {
+      setError(pairingCodeGuidance);
+      return;
+    }
     setError(null);
     cancelledRef.current = false;
     setAnalysis(null);
     setResult(null);
-    setProgress(importProgressLabel("connecting"));
+    setProgress(selection === "authorized" ? sensorImportWaitingCopy : importProgressLabel("connecting"));
     setStage("connecting");
     try {
       const vault = vaultRef.current;
-      const credentials = sensorImportCredentialCallbacks(vault, remember, (peerId) => { selectedPeerIdRef.current = peerId; });
+      const credentials = sensorImportCredentialCallbacks(vault, remember, (peerId) => {
+        selectedPeerIdRef.current = peerId;
+        if (selection === "authorized") setAuthorizedPeerFound(true);
+      });
       const created = createController(credentials);
       const controller = created instanceof Promise ? await created : created;
       controllerRef.current = controller;
-      setStage("backfill");
-      setProgress(importProgressLabel("backfill"));
       const imported = await controller.importSensor({
         sensorName,
-        userActivation: true,
+        userActivation: selection === "chooser",
         credential: credentialRef.current,
-        pairingCode: pairingCode.trim() || null,
+        pairingCode: selection === "authorized" ? null : pairingCode,
         certificateBundle: certificateRef.current,
+        selection,
       });
       if (!mountedRef.current || cancelledRef.current) return;
       setResult(imported);
@@ -209,12 +230,25 @@ export function SensorImportClient({
         setProgress(importProgressLabel("done"));
       }
     } catch (caught) {
+      if (selection === "authorized") {
+        if (mountedRef.current && !cancelledRef.current) {
+          setStage("idle");
+          setProgress(sensorImportWaitingCopy);
+        }
+        return;
+      }
       if (!mountedRef.current || cancelledRef.current) return;
       setStage("error");
       setError(sensorImportError(caught));
       setProgress(importProgressLabel("error"));
     }
   }, [createController, pairingCode, remember, stage, support, sensorName]);
+
+  useEffect(() => {
+    if (!vaultReady || support?.state !== "supported" || stage !== "idle" || autoReconnectStartedRef.current) return;
+    autoReconnectStartedRef.current = true;
+    void connect("authorized");
+  }, [connect, stage, support, vaultReady]);
 
   const disconnect = useCallback(async () => {
     await stop();
@@ -244,24 +278,26 @@ export function SensorImportClient({
         <h2 id="sensor-prerequisites-title" className="text-lg font-semibold text-ink">Before you connect</h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-soft">Requires Google Chrome, Bluetooth, and a Dexcom G7 sensor.</p>
         <p className="mt-3 text-sm text-ink-soft" role="status">{support && capability ? browserSupportMessage({ ...capability, userAgent: typeof navigator === "undefined" ? undefined : navigator.userAgent }) : "Checking browser support…"}</p>
+        <p className="mt-3 text-sm leading-6 text-ink-soft">{sensorImportWaitingCopy}</p>
       </section>
 
       <section className="border border-rule bg-paper-raised p-6" aria-labelledby="sensor-connect-title">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="sensor-connect-title" className="text-lg font-semibold text-ink">Connect locally</h2>
-          <span className="text-xs text-ink-faint">Nothing is uploaded. No background connection.</span>
+          <span className="text-xs text-ink-faint">Nothing is uploaded. The page remains open while it waits for the sensor.</span>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="text-sm text-ink-soft">Sensor name<input value={sensorName} onChange={(event) => setSensorName(event.target.value)} className="mt-1 block w-full border border-rule-strong bg-paper px-3 py-2 text-ink" /></label>
-          <label className="text-sm text-ink-soft">Pairing code (optional)<input value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} inputMode="numeric" autoComplete="off" className="mt-1 block w-full border border-rule-strong bg-paper px-3 py-2 text-ink" /></label>
+          <label className="text-sm text-ink-soft">Pairing code<input required value={pairingCode} onChange={(event) => setPairingCode(event.target.value)} inputMode="numeric" autoComplete="off" aria-describedby="pairing-code-guidance" className="mt-1 block w-full border border-rule-strong bg-paper px-3 py-2 text-ink" /></label>
           {diagnosticsVisible ? <>
             <label className="text-sm text-ink-soft">Remembered key (optional)<input type="file" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file) void file.arrayBuffer().then((bytes) => { if (mountedRef.current) credentialRef.current = new Uint8Array(bytes); }); else credentialRef.current = null; }} className="mt-1 block w-full text-sm text-ink-soft file:mr-3 file:border file:border-rule-strong file:bg-paper file:px-3 file:py-1.5 file:text-xs" /></label>
             <label className="text-sm text-ink-soft">Opaque certificate bundle (optional)<input type="file" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file) void file.arrayBuffer().then((bytes) => { if (mountedRef.current) certificateRef.current = new Uint8Array(bytes); }); else certificateRef.current = null; }} className="mt-1 block w-full text-sm text-ink-soft file:mr-3 file:border file:border-rule-strong file:bg-paper file:px-3 file:py-1.5 file:text-xs" /></label>
           </> : null}
         </div>
+        <p id="pairing-code-guidance" className="mt-2 text-xs text-ink-faint">{pairingCodeGuidance}</p>
         <label className="mt-4 flex items-center gap-2 text-sm text-ink-soft"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Remember this sensor on this browser</label>
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => void connect()} disabled={support?.state !== "supported" || busy} className="bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-ink disabled:cursor-not-allowed disabled:opacity-50">{busy ? progress || "Working…" : stage === "error" ? "Retry connection" : "Connect Dexcom G7"}</button>
+          <button type="button" onClick={() => void connect()} disabled={support?.state !== "supported" || busy || !isValidPairingCode(pairingCode)} className="bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-ink disabled:cursor-not-allowed disabled:opacity-50">{busy ? progress || "Working…" : authorizedPeerFound ? "Choose another sensor" : stage === "error" ? "Retry connection" : "Connect Dexcom G7"}</button>
           {busy ? <button type="button" onClick={() => { cancelledRef.current = true; void stop(); setStage("cancelled"); setProgress(importProgressLabel("cancelled")); }} className="border border-rule-strong px-4 py-2.5 text-sm text-ink-soft hover:border-accent hover:text-accent">Cancel</button> : null}
           {stage === "done" || result ? <button type="button" onClick={() => void disconnect()} className="border border-rule-strong px-4 py-2.5 text-sm text-ink-soft hover:border-accent hover:text-accent">Disconnect</button> : null}
           {result ? <button type="button" onClick={() => void forget()} className="text-sm text-ink-faint underline decoration-dotted underline-offset-4 hover:text-accent">Forget local key</button> : null}
@@ -285,7 +321,7 @@ export function SensorImportClient({
 
       {analysis ? <section aria-labelledby="sensor-analysis-title"><div className="border-b border-rule pb-3"><h2 id="sensor-analysis-title" className="text-lg font-semibold text-ink">Your analysis</h2><p className="mt-1 text-xs text-ink-faint">The full local analysis used by the worked example.</p></div><ExampleAnalysisView data={analysis} owner="own" /></section> : null}
 
-      <p className="measure text-xs leading-5 text-ink-faint">This is a research instrument, not medical advice or a medical device. The page reads only what the connected sensor makes available, keeps data in this tab, and does not maintain a background connection.</p>
+      <p className="measure text-xs leading-5 text-ink-faint">This is a research instrument, not medical advice or a medical device. The page reads only what the connected sensor makes available, keeps data in this tab, and does not connect when the page is closed.</p>
     </div>
   );
 }

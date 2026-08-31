@@ -13,11 +13,13 @@ The primary UI requirement is:
 
 > Requires Google Chrome, Bluetooth, and a Dexcom G7 sensor.
 
-The Connect button must be used to start the operation. The browser's own
-capability and permission checks are authoritative. In production, use the
-HTTPS host above. `http://localhost` is supported for development only because
-localhost is a browser secure-context exception; an arbitrary HTTP deployment
-is not supported.
+For a new sensor, enter the four-digit pairing code and use the Connect button
+to start the operation. The first browser Bluetooth operation is the chooser,
+so it must stay directly under that click. The browser's own capability and
+permission checks are authoritative. In production, use the HTTPS host above.
+`http://localhost` is supported for development only because localhost is a
+browser secure-context exception; an arbitrary HTTP deployment is not
+supported.
 
 ## What happens locally
 
@@ -38,27 +40,37 @@ an already-compromised origin.
 
 ## Credentials and local persistence
 
-Pairing material is optional when the sensor can authenticate with an existing
-local state. The page can accept a pairing code, an exported remembered key, or
-an opaque certificate bundle when a session requires one. These values stay in
-the tab and are passed only to the local engine.
+The page can accept a pairing code, an exported remembered key, or an opaque
+certificate bundle when a session requires one. These values stay in the tab
+and are passed only to the local engine. Diagnostic key and certificate inputs
+are available only with the exact `?debug=yesplease` query.
 
 Remembering a key is a separate opt-in checkbox and is off by default. When
 IndexedDB is available, the credential vault encrypts the key with WebCrypto
 AES-GCM and stores the non-extractable key plus ciphertext locally, scoped to
-the sensor. If persistent storage is unavailable, the vault falls back to a
-session-only in-memory choice. “Forget local key” removes the stored record.
+the browser-authorized sensor identity. While this page remains open, it can
+automatically reconnect when exactly one authorized sensor has a remembered
+credential; it does not guess when none or multiple sensors are eligible.
+Choose another sensor to open the chooser and enter the code again. If
+persistent storage is unavailable, the vault falls back to a session-only
+in-memory choice. “Forget local key” removes the stored record.
 Browser memory, browser backups, extensions, developer tools, and malicious
 same-origin code are outside this protection; do not treat the vault as a
 device security boundary.
 
 ## Support and limitations
 
-The chooser may show no sensor when the sensor is out of range, asleep,
-unavailable, or already occupied by another application. Stop the competing
-session, bring the sensor nearby, and retry. A cancelled chooser, denied
-permission, missing credential, or lost link can be retried locally; the page
-does not bypass the browser's Bluetooth permission model.
+The sensor becomes available briefly about every five minutes. Keep this page
+open; discovery can take several minutes. A sleeping or unavailable remembered
+sensor remains a waiting state. Stop the competing session, bring the sensor
+nearby, and use Choose another sensor if needed. A cancelled
+chooser, denied permission, missing credential, or lost link can be retried
+locally; the page does not bypass the browser's Bluetooth permission model.
+
+Chrome cannot complete a new operating-system Bluetooth bond through this page.
+The first pairing can still reach the sensor protocol's pairing step, but a
+browser-authorized sensor with prepared pairing information or an existing host
+bond may be required at that boundary.
 
 The importer returns only the history the sensor makes available. History may
 have expired or the link may end before the requested range is delivered. The

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSensorController, getWebSensorSupport, type SensorControllerDependencies } from "./ubm-controller";
+import { createSensorController, getWebSensorSupport, type SensorChooserRequest, type SensorControllerDependencies } from "./ubm-controller";
 import type { EngineAction, EngineCommand, ImportedSensorReading } from "./contracts";
 
 function fakeManager() {
@@ -54,6 +54,27 @@ test("keeps the chooser in the user-activation path and orders subscriptions bef
   assert.deepEqual(result.records, [reading]);
   assert.deepEqual(fake.calls.slice(0, 4), ["choose", "connect", "discover", "subscribe:service/auth"]);
   assert.equal(fake.calls[4], "write:service/auth:required:1");
+});
+
+test("passes advertisement filter and actual GATT service as optional chooser service", async () => {
+  let chooserRequest: unknown;
+  const fake = fakeManager();
+  const manager = {
+    ...fake.manager,
+    choose: async (request: SensorChooserRequest) => { chooserRequest = request; return { id: "peer" }; },
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({ push: async () => [], stop: async () => undefined }),
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { chooserServiceUuid: "advertised", serviceUuid: "gatt-service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "sensor", userActivation: true, pairingCode: "1234" });
+
+  assert.deepEqual(chooserRequest, { filters: [{ serviceUuids: ["advertised"] }], optionalServices: ["gatt-service"] });
 });
 
 test("truthfully rejects chooser use outside transient activation", async () => {
@@ -150,6 +171,316 @@ test("retries after a failed action while preserving the partial history and cle
   assert.deepEqual(result.records, [reading]);
   assert.equal(result.completeness, "complete");
   assert.equal(disconnects, 2);
+});
+
+test("creates and stops a fresh engine for each protocol attempt", async () => {
+  let engineCount = 0;
+  const stoppedEngines: number[] = [];
+  const fake = fakeManager();
+  const deps: SensorControllerDependencies = {
+    createManager: async () => fake.manager,
+    createEngine: async () => {
+      const engineId = ++engineCount;
+      return {
+        push: async (command: EngineCommand) => command.kind === "start"
+          ? engineId === 1 ? [{ kind: "failure", category: "history-incomplete" }] : [{ kind: "complete", completeness: "complete" }]
+          : [],
+        stop: async () => { stoppedEngines.push(engineId); },
+      };
+    },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 2, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  const result = await controller.importSensor({ sensorName: "sensor", userActivation: true });
+
+  assert.equal(result.completeness, "complete");
+  assert.equal(engineCount, 2);
+  assert.deepEqual(stoppedEngines, [1, 2]);
+});
+
+test("waits for asynchronous notification completion before cleaning up", async () => {
+  let releaseFrame: (() => void) | undefined;
+  const frameReady = new Promise<void>(resolve => { releaseFrame = resolve; });
+  let settled = false;
+  let engineStopped = 0;
+  const fake = fakeManager();
+  const manager = {
+    ...fake.manager,
+    connect: async () => ({
+      discover: async () => ({
+        characteristic: () => ({
+          subscribe: async () => ({ values: (async function* () { await frameReady; yield { value: new Uint8Array([1]) }; })(), remove: async () => undefined }),
+          write: async () => undefined,
+        }),
+      }),
+      disconnect: async () => undefined,
+    }),
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => {
+        if (command.kind === "start") return [{ kind: "subscribe", actionId: 1, channel: "authentication" }];
+        if (command.kind === "frame") return [{ kind: "complete", completeness: "complete" }];
+        return [];
+      },
+      stop: async () => { engineStopped += 1; },
+    }),
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  const importing = controller.importSensor({ sensorName: "sensor", userActivation: true });
+  importing.then(() => { settled = true; });
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  assert.equal(engineStopped, 0);
+  releaseFrame?.();
+  await importing;
+  assert.equal(settled, true);
+  assert.equal(engineStopped, 1);
+});
+
+test("delivers readings incrementally before a later notification failure", async () => {
+  const delivered: ImportedSensorReading[] = [];
+  const fake = fakeManager();
+  const manager = {
+    ...fake.manager,
+    connect: async () => ({
+      discover: async () => ({ characteristic: () => ({
+        subscribe: async () => ({ values: (async function* () { yield { value: new Uint8Array([1]) }; throw new Error("stream lost"); })(), remove: async () => undefined }),
+        write: async () => undefined,
+      }) }),
+      disconnect: async () => undefined,
+    }),
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => {
+        if (command.kind === "start") return [{ kind: "subscribe", actionId: 1, channel: "authentication" }];
+        if (command.kind === "frame") return [{ kind: "reading", reading }];
+        return [];
+      },
+      stop: async () => undefined,
+    }),
+    onReading: async current => { delivered.push(current); },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  const result = await controller.importSensor({ sensorName: "sensor", userActivation: true });
+
+  assert.deepEqual(delivered, [reading]);
+  assert.deepEqual(result.records, [reading]);
+  assert.equal(result.completeness, "partial");
+});
+
+test("fails closed when incremental reading persistence fails", async () => {
+  const fake = fakeManager();
+  const deps: SensorControllerDependencies = {
+    createManager: async () => fake.manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => command.kind === "start" ? [{ kind: "reading", reading }] : [],
+      stop: async () => undefined,
+    }),
+    onReading: async () => { throw new Error("archive unavailable"); },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await assert.rejects(controller.importSensor({ sensorName: "sensor", userActivation: true }), /archive unavailable/);
+});
+
+test("rejects and sends one terminal command when the connection link is lost", async () => {
+  let releaseLoss: (() => void) | undefined;
+  const lossReady = new Promise<void>(resolve => { releaseLoss = resolve; });
+  const notificationWaiting = new Promise<void>(() => undefined);
+  const terminalCommands: EngineCommand[] = [];
+  const fake = fakeManager();
+  const manager = {
+    ...fake.manager,
+    connect: async () => ({
+      discover: async () => ({ characteristic: () => ({ subscribe: async () => ({ values: (async function* () { await notificationWaiting; })(), remove: async () => undefined }), write: async () => undefined }) }),
+      disconnect: async () => undefined,
+      lifecycleEvents: (async function* () { await lossReady; yield { current: "lost" }; })(),
+    }),
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({
+      push: async (command: EngineCommand) => {
+        if (command.kind === "terminal") terminalCommands.push(command);
+        if (command.kind === "start") return [{ kind: "subscribe", actionId: 1, channel: "authentication" }];
+        return [];
+      },
+      stop: async () => undefined,
+    }),
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  const importing = controller.importSensor({ sensorName: "sensor", userActivation: true });
+  await new Promise<void>(resolve => setImmediate(resolve));
+  releaseLoss?.();
+  await assert.rejects(importing, /link-lost/);
+  assert.deepEqual(terminalCommands, [{ kind: "terminal", reason: "link-lost" }]);
+});
+
+test("selects the chooser once and retries the same peer", async () => {
+  const fake = fakeManager();
+  let chooses = 0;
+  let connects = 0;
+  let starts = 0;
+  const pairingCodes: (string | null)[] = [];
+  const manager = {
+    ...fake.manager,
+    choose: async () => { chooses += 1; return { id: "stable-peer", name: "G7" }; },
+    connect: async () => {
+      connects += 1;
+      return {
+        discover: async () => ({ characteristic: () => ({ subscribe: async () => ({ values: (async function* () {})(), remove: async () => undefined }), write: async () => undefined }) }),
+        disconnect: async () => undefined,
+      };
+    },
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({ push: async (command: EngineCommand) => {
+      if (command.kind !== "start") return [];
+      pairingCodes.push(command.pairingCode);
+      return ++starts === 1 ? [{ kind: "failure", category: "history-incomplete" }] : [{ kind: "complete", completeness: "complete" }];
+    }, stop: async () => undefined }),
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 2, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "sensor", userActivation: true, pairingCode: "1234" });
+
+  assert.equal(chooses, 1);
+  assert.equal(connects, 2);
+  assert.deepEqual(pairingCodes, ["1234", "1234"]);
+});
+
+test("automatically selects the only authorized peer with a remembered credential without activation", async () => {
+  const starts: EngineCommand[] = [];
+  const peer = { id: "authorized-peer", name: "Remembered G7" };
+  const fake = fakeManager();
+  const manager = {
+    ...fake.manager,
+    choose: async () => { throw new Error("chooser must not run"); },
+    peers: { authorized: async () => [peer] },
+    connect: async (selected: { id: string }) => {
+      assert.equal(selected.id, peer.id);
+      return { discover: async () => ({ characteristic: () => ({ subscribe: async () => ({ values: (async function* () {})(), remove: async () => undefined }), write: async () => undefined }) }), disconnect: async () => undefined };
+    },
+  };
+  const credential = new Uint8Array([6]);
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({ push: async (command: EngineCommand) => { starts.push(command); return command.kind === "start" ? [{ kind: "complete", completeness: "complete" }] : []; }, stop: async () => undefined }),
+    loadCredential: async (peerId) => { assert.equal(peerId, peer.id); return credential; },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "fallback name", userActivation: false, selection: "authorized" });
+
+  const start = starts.find((command): command is Extract<EngineCommand, { kind: "start" }> => command.kind === "start");
+  assert.equal(start?.sensorName, peer.name);
+  assert.deepEqual(start?.credential, credential);
+  assert.equal(start?.pairingCode, null);
+});
+
+test("does not guess when zero or multiple authorized peers have credentials", async () => {
+  const fake = fakeManager();
+  let authorized: readonly { id: string; name: string }[] = [];
+  const manager = { ...fake.manager, choose: async () => { throw new Error("chooser must not run"); }, peers: { authorized: async () => authorized } };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({ push: async () => [], stop: async () => undefined }),
+    loadCredential: async () => new Uint8Array([1]),
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await assert.rejects(controller.importSensor({ sensorName: "sensor", userActivation: false, selection: "authorized" }), /choose sensor/);
+  authorized = [{ id: "peer-a", name: "A" }, { id: "peer-b", name: "B" }];
+  const loadCredential = async (peerId: string) => peerId === "peer-a" ? new Uint8Array([1]) : new Uint8Array([2]);
+  const multiple = createSensorController({ ...deps, loadCredential }, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+  await assert.rejects(multiple.importSensor({ sensorName: "sensor", userActivation: false, selection: "authorized" }), /choose sensor/);
+});
+
+test("waits between authorized connection attempts until a sleeping sensor wakes", async () => {
+  let connects = 0;
+  const delays: number[] = [];
+  const peer = { id: "sleeping-peer", name: "G7" };
+  const fake = fakeManager();
+  const manager = {
+    ...fake.manager,
+    choose: async () => { throw new Error("chooser must not run"); },
+    peers: { authorized: async () => [peer] },
+    connect: async () => {
+      connects += 1;
+      if (connects < 2) throw new Error("sensor asleep");
+      return { discover: async () => ({ characteristic: () => ({ subscribe: async () => ({ values: (async function* () {})(), remove: async () => undefined }), write: async () => undefined }) }), disconnect: async () => undefined };
+    },
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({ push: async (command: EngineCommand) => command.kind === "start" ? [{ kind: "complete", completeness: "complete" }] : [], stop: async () => undefined }),
+    loadCredential: async () => new Uint8Array([1]),
+    clock: () => 0,
+    timer: { sleep: async delay => { delays.push(delay); } },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, authorizedRetryAttempts: 2, authorizedRetryDelayMs: 7, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "sensor", userActivation: false, selection: "authorized" });
+
+  assert.equal(connects, 2);
+  assert.deepEqual(delays, [7]);
+});
+
+test("stops an authorized reconnect wait without another check", async () => {
+  let connects = 0;
+  let releaseDelay: (() => void) | undefined;
+  const delayGate = new Promise<void>(resolve => { releaseDelay = resolve; });
+  const fake = fakeManager();
+  const manager = { ...fake.manager, choose: async () => { throw new Error("chooser must not run"); }, peers: { authorized: async () => [{ id: "sleeping-peer", name: "G7" }] }, connect: async () => { connects += 1; throw new Error("sensor asleep"); } };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({ push: async () => [], stop: async () => undefined }),
+    loadCredential: async () => new Uint8Array([1]),
+    clock: () => 0,
+    timer: { sleep: async () => delayGate },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, authorizedRetryAttempts: 3, authorizedRetryDelayMs: 7, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  const importing = controller.importSensor({ sensorName: "sensor", userActivation: false, selection: "authorized" });
+  await new Promise<void>(resolve => setImmediate(resolve));
+  await controller.stop();
+  releaseDelay?.();
+  await assert.rejects(importing, /stopped/);
+  assert.equal(connects, 1);
 });
 
 test("fails truthfully when the engine requests unsupported browser OS pairing", async () => {
@@ -257,18 +588,19 @@ test("does not persist stale actions after a retry or stop", async () => {
 });
 
 test("does not persist a notification action from a prior retry generation", async () => {
-  let attempt = 0;
+  let connects = 0;
+  let starts = 0;
   let releaseOldFrame: (() => void) | undefined;
   const oldFrameGate = new Promise<void>(resolve => { releaseOldFrame = resolve; });
   const saves: string[] = [];
   const manager = {
     choose: async () => {
-      attempt += 1;
-      if (attempt === 2) releaseOldFrame?.();
-      return { id: `peer-${attempt}` };
+      return { id: "peer-1" };
     },
     connect: async () => {
-      const connectionAttempt = attempt;
+      connects += 1;
+      if (connects === 2) releaseOldFrame?.();
+      const connectionAttempt = connects;
       return {
         discover: async () => ({
           characteristic: () => ({
@@ -290,8 +622,8 @@ test("does not persist a notification action from a prior retry generation", asy
     createManager: async () => manager,
     createEngine: async () => ({
       push: async (command: EngineCommand) => {
-        if (command.kind === "start") return [{ kind: "subscribe", actionId: 1, channel: "authentication" }];
-        if (command.kind === "action-result" && attempt === 1) return [{ kind: "failure", category: "history-incomplete" }];
+        if (command.kind === "start") { starts += 1; return [{ kind: "subscribe", actionId: 1, channel: "authentication" }]; }
+        if (command.kind === "action-result" && starts === 1) return [{ kind: "failure", category: "history-incomplete" }];
         if (command.kind === "frame") return [{ kind: "persist-credential", credential: new Uint8Array([2]) }];
         return [{ kind: "complete", completeness: "complete" }];
       },

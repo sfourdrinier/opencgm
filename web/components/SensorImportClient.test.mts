@@ -4,11 +4,16 @@ import type { SensorImportResult } from "../lib/sensor/contracts";
 import {
   browserCapabilitySnapshot,
   browserSupportMessage,
+  isValidPairingCode,
   importProgressLabel,
   privacyCopy,
+  pairingCodeGuidance,
   sensorImportCredentialCallbacks,
+  sensorImportBluetoothOptions,
   sensorImportDiagnosticsVisible,
   sensorImportCoverage,
+  sensorImportWaitingCopy,
+  sensorImportError,
 } from "./SensorImportClient";
 
 const imported: SensorImportResult = {
@@ -67,6 +72,39 @@ test("keeps non-Linux Chrome recovery guidance generic", () => {
   assert.doesNotMatch(message, /hci0|enable-experimental-web-platform-features/);
   const androidMessage = browserSupportMessage({ secureContext: true, bluetooth: false, userAgent: "Mozilla/5.0 (Linux; Android 15) Chrome/140.0" });
   assert.doesNotMatch(androidMessage, /hci0|enable-experimental-web-platform-features/);
+});
+
+test("requires exactly four ASCII digits for a first pairing", () => {
+  assert.equal(isValidPairingCode("1234"), true);
+  assert.equal(isValidPairingCode(""), false);
+  assert.equal(isValidPairingCode("123"), false);
+  assert.equal(isValidPairingCode("12345"), false);
+  assert.equal(isValidPairingCode("１２３４"), false);
+  assert.match(pairingCodeGuidance, /four ASCII digits/);
+});
+
+test("uses truthful waiting copy for intermittent sensor availability", () => {
+  assert.match(sensorImportWaitingCopy, /about every five minutes/);
+  assert.match(sensorImportWaitingCopy, /keep this page open/i);
+  assert.match(sensorImportWaitingCopy, /several minutes/);
+  assert.doesNotMatch(sensorImportWaitingCopy, /exactly|seconds|window/);
+});
+
+test("explains the browser OS-bond boundary without claiming first-pair success", () => {
+  const message = sensorImportError(new Error("browser Web Bluetooth does not support OS pairing"));
+  assert.match(message, /cannot finish a new operating-system Bluetooth bond/i);
+  assert.match(message, /browser-authorized sensor/i);
+});
+
+test("uses the proven Dexcom advertisement and GATT UUIDs", () => {
+  assert.equal(sensorImportBluetoothOptions.chooserServiceUuid, "0000febc-0000-1000-8000-00805f9b34fb");
+  assert.equal(sensorImportBluetoothOptions.serviceUuid, "f8083532-849e-531c-c594-30f1f86a4ea5");
+  assert.deepEqual(sensorImportBluetoothOptions.channels, {
+    authentication: "f8083535-849e-531c-c594-30f1f86a4ea5",
+    control: "f8083534-849e-531c-c594-30f1f86a4ea5",
+    backfill: "f8083536-849e-531c-c594-30f1f86a4ea5",
+    "extra-data": "f8083538-849e-531c-c594-30f1f86a4ea5",
+  });
 });
 
 test("summarises counts, duplicate rows, range, cadence, gaps, and completeness", () => {
