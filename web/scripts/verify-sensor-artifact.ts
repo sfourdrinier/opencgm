@@ -51,6 +51,8 @@ type ArtifactManifest = {
   readonly byteLength: number;
   readonly sha256: string;
   readonly exports: readonly string[];
+  readonly maximumInputBytes: typeof ARTIFACT_MAX_BYTES;
+  readonly maximumOutputBytes: typeof ARTIFACT_MAX_BYTES;
   readonly toolchain: { readonly [key: string]: string };
   readonly licenses: readonly string[];
 };
@@ -135,6 +137,8 @@ function isManifest(value: unknown): value is ArtifactManifest {
   if (!("byteLength" in value) || typeof value.byteLength !== "number") return false;
   if (!("sha256" in value) || typeof value.sha256 !== "string") return false;
   if (!("exports" in value) || !Array.isArray(value.exports) || !value.exports.every((entry): entry is string => typeof entry === "string")) return false;
+  if (!("maximumInputBytes" in value) || value.maximumInputBytes !== ARTIFACT_MAX_BYTES) return false;
+  if (!("maximumOutputBytes" in value) || value.maximumOutputBytes !== ARTIFACT_MAX_BYTES) return false;
   if (!("toolchain" in value) || !isStringRecord(value.toolchain)) return false;
   if (!("licenses" in value) || !Array.isArray(value.licenses) || !value.licenses.every((entry): entry is string => typeof entry === "string")) return false;
   return true;
@@ -158,6 +162,7 @@ function parseManifest(text: string): ArtifactManifest {
   }
   if (!/^[0-9a-f]{64}$/u.test(parsed.sha256)) fail("manifest SHA-256 is not lowercase hex");
   if (!equalStrings([...parsed.exports].sort(), [...REQUIRED_EXPORTS].sort())) fail("manifest exports are not exact");
+  if (parsed.maximumInputBytes !== ARTIFACT_MAX_BYTES || parsed.maximumOutputBytes !== ARTIFACT_MAX_BYTES) fail("manifest ABI bounds are not exact");
   for (const key of ["rustc", "cargo", "wasmOpt", "wasmTools"]) {
     if (parsed.toolchain[key] === undefined || parsed.toolchain[key].length === 0) fail(`manifest tool receipt ${key} is missing`);
   }

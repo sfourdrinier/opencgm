@@ -17,6 +17,8 @@ type ArtifactManifest = {
   readonly byteLength: number;
   readonly sha256: string;
   readonly exports: readonly string[];
+  readonly maximumInputBytes: number;
+  readonly maximumOutputBytes: number;
   readonly toolchain: Record<string, string>;
   readonly licenses: readonly string[];
 };
@@ -35,6 +37,8 @@ test("ships exactly one audited ABI 1 sensor artifact and matching manifest", as
   assert.equal(manifest.byteLength, artifact.byteLength);
   assert.equal(manifest.sha256, createHash("sha256").update(artifact).digest("hex"));
   assert.deepEqual(manifest.exports, ["a", "d", "memory", "x"]);
+  assert.equal(manifest.maximumInputBytes, 1024 * 1024);
+  assert.equal(manifest.maximumOutputBytes, 1024 * 1024);
   assert.doesNotThrow(() => new WebAssembly.Module(artifact));
   const verified = await verifySensorArtifact();
   assert.deepEqual(verified, {
