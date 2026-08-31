@@ -104,6 +104,13 @@ test("explains the browser OS-bond boundary without claiming first-pair success"
   assert.match(message, /browser-authorized sensor/i);
 });
 
+test("turns a connection deadline into actionable retry guidance", () => {
+  assert.equal(
+    sensorImportError(new Error("operation timed out")),
+    "The sensor connection timed out. Keep the sensor nearby, stop any competing phone connection, and retry during its next Bluetooth window.",
+  );
+});
+
 test("uses the proven Dexcom advertisement and GATT UUIDs", () => {
   assert.equal(sensorImportBluetoothOptions.chooserServiceUuid, "0000febc-0000-1000-8000-00805f9b34fb");
   assert.equal(sensorImportBluetoothOptions.serviceUuid, "f8083532-849e-531c-c594-30f1f86a4ea5");

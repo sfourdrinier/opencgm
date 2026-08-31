@@ -77,6 +77,30 @@ test("passes advertisement filter and actual GATT service as optional chooser se
   assert.deepEqual(chooserRequest, { filters: [{ serviceUuids: ["advertised"] }], optionalServices: ["gatt-service"] });
 });
 
+test("passes a bounded connection deadline through the manager contract", async () => {
+  let connectOptions: unknown;
+  const fake = fakeManager();
+  const manager = {
+    ...fake.manager,
+    connect: async (peer: { id: string }, options?: { readonly timeoutMs: number }) => {
+      connectOptions = options;
+      return fake.manager.connect(peer);
+    },
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({ push: async () => [], stop: async () => undefined }),
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { connectTimeoutMs: 42, maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "sensor", userActivation: true });
+
+  assert.deepEqual(connectOptions, { timeoutMs: 42 });
+});
+
 test("truthfully rejects chooser use outside transient activation", async () => {
   const fake = fakeManager();
   const deps: SensorControllerDependencies = {

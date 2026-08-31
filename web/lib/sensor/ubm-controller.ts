@@ -25,6 +25,7 @@ export class SensorSelectionError extends Error {
 
 const DEFAULT_AUTHORIZED_RETRY_DELAY_MS = 15_000;
 const DEFAULT_AUTHORIZED_RETRY_ATTEMPTS = 25;
+const DEFAULT_CONNECT_TIMEOUT_MS = 20_000;
 
 export function getWebSensorSupport(input: { readonly secureContext: boolean; readonly bluetooth: boolean; readonly origin?: string }): WebSensorSupport {
   const localhostException = input.origin !== undefined && /^http:\/\/localhost(?::\d+)?$/u.test(input.origin);
@@ -54,7 +55,7 @@ export type SensorConnection = {
 export type SensorManager = {
   readonly choose: (request: SensorChooserRequest) => Promise<SensorPeer>;
   readonly peers?: { readonly authorized: () => Promise<readonly SensorPeer[]> };
-  readonly connect: (peer: SensorPeer) => Promise<SensorConnection>;
+  readonly connect: (peer: SensorPeer, options?: { readonly timeoutMs: number }) => Promise<SensorConnection>;
   readonly destroy: () => Promise<unknown>;
 };
 export type SensorChooserRequest = {
@@ -99,6 +100,7 @@ export type SensorControllerOptions = {
   readonly maxAttempts?: number;
   readonly authorizedRetryDelayMs?: number;
   readonly authorizedRetryAttempts?: number;
+  readonly connectTimeoutMs?: number;
 };
 export type SensorImportRequest = {
   readonly sensorName: string;
@@ -129,8 +131,8 @@ export function createDefaultSensorController(
             return { id: peer.id, name: peer.name };
           },
           peers: { authorized: async () => (await ble.peers.authorized()).map(peer => ({ id: peer.id, name: peer.name })) },
-          connect: async (peer) => {
-            const connection = await ble.connect(peer.id);
+          connect: async (peer, connectOptions) => {
+            const connection = await ble.connect(peer.id, { timeoutMs: connectOptions?.timeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS });
             return {
               discover: async () => {
                 const database = await connection.discover();
@@ -214,6 +216,7 @@ export function createSensorController(
       ? Math.max(1, options.authorizedRetryAttempts ?? DEFAULT_AUTHORIZED_RETRY_ATTEMPTS)
       : Math.max(1, options.maxAttempts ?? 2);
     const retryDelayMs = Math.max(0, options.authorizedRetryDelayMs ?? DEFAULT_AUTHORIZED_RETRY_DELAY_MS);
+    const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
     credentialPersistenceFailedForCurrentRun = false;
     readingPersistenceFailedForCurrentRun = false;
     try {
@@ -241,7 +244,7 @@ export function createSensorController(
             await dependencies.timer.sleep(retryDelayMs);
             if (stopped) throw new Error("sensor controller stopped");
           }
-          connection = await manager!.connect(peer);
+          connection = await manager!.connect(peer, { timeoutMs: connectTimeoutMs });
           if (stopped) throw new Error("sensor controller stopped");
           const database = await connection.discover();
           if (stopped) throw new Error("sensor controller stopped");

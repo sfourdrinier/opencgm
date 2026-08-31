@@ -125,6 +125,7 @@ export function sensorImportError(error: unknown): string {
   if (message.includes("activation")) return "Connect must begin from the Connect button.";
   if (message.includes("choose sensor")) return "Choose a sensor to reconnect.";
   if (message.includes("os pairing")) return "Chrome cannot finish a new operating-system Bluetooth bond here. Use a browser-authorized sensor with prepared pairing information, then retry.";
+  if (message.includes("timed") || message.includes("timeout")) return "The sensor connection timed out. Keep the sensor nearby, stop any competing phone connection, and retry during its next Bluetooth window.";
   if (message.includes("cancel")) return "The connection was cancelled before history was read.";
   if (message.includes("pair")) return "The sensor needs pairing information.";
   return "The local sensor connection did not complete. Check that the sensor is nearby, then try again.";
