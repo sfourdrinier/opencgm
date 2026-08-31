@@ -36,7 +36,7 @@ export const privacyCopy = "Your data stays in this browser. Sensor readings and
 export const pairingCodeGuidance = "Enter the four ASCII digits from the sensor applicator or pairing material.";
 export const pairingCodeRequiredCopy = "— Need pairing code";
 export const sensorImportWaitingCopy = "A sensor may become available briefly about every five minutes. Keep this page open; discovery can take several minutes. A sleeping or unavailable remembered sensor remains in a waiting state.";
-export const sensorSelectedCopy = "Sensor selected. Opening its Bluetooth connection for up to 20 seconds…";
+export const sensorSelectedCopy = "Sensor selected. Waiting up to five minutes for its Bluetooth connection…";
 
 export function isValidPairingCode(value: string): boolean {
   return /^[0-9]{4}$/u.test(value);
@@ -47,6 +47,7 @@ export function sensorImportDiagnosticsVisible(search: string): boolean {
 }
 
 export const sensorImportBluetoothOptions = {
+  connectTimeoutMs: 300_000,
   chooserServiceUuid: "0000febc-0000-1000-8000-00805f9b34fb",
   serviceUuid: "f8083532-849e-531c-c594-30f1f86a4ea5",
   channels: {
@@ -130,7 +131,7 @@ export function sensorImportError(error: unknown): string {
       case "platform.security": return "Chrome or the operating system denied Bluetooth access. Check this site's Bluetooth permission and retry.";
       case "gatt.not-found": return "Chrome connected, but the expected Dexcom G7 Bluetooth service was not available on that device.";
       case "operation.disconnected": return "The sensor disconnected before the import completed. Any readings already received remain saved; retry during the next sensor window.";
-      case "chooser.cancelled": return "The Bluetooth chooser closed before a sensor was selected.";
+      case "chooser.cancelled": return "The Bluetooth chooser closed without selecting a compatible sensor. Keep the sensor nearby and try again.";
     }
   }
   const message = error instanceof Error ? error.message.toLowerCase() : "";

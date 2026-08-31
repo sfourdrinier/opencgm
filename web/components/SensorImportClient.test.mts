@@ -100,7 +100,26 @@ test("uses truthful waiting copy for intermittent sensor availability", () => {
 });
 
 test("explains that a selected sensor is connecting instead of asking for another prompt", () => {
-  assert.equal(sensorSelectedCopy, "Sensor selected. Opening its Bluetooth connection for up to 20 seconds…");
+  assert.equal(sensorSelectedCopy, "Sensor selected. Waiting up to five minutes for its Bluetooth connection…");
+});
+
+test("keeps one selected-device connection attempt alive for the sensor wake interval", () => {
+  assert.equal(sensorImportBluetoothOptions.connectTimeoutMs, 300_000);
+});
+
+test("describes Chrome NotFoundError without claiming the user cancelled", () => {
+  const error = new BleError("chooser.cancelled", "chooser", "web-chooser.choose", {
+    platform: {
+      domain: "web-bluetooth",
+      code: "NotFoundError",
+      safeMessage: "The Web Bluetooth operation failed.",
+      metadata: { browserErrorName: "NotFoundError" },
+    },
+  });
+  assert.equal(
+    sensorImportError(error),
+    "The Bluetooth chooser closed without selecting a compatible sensor. Keep the sensor nearby and try again.",
+  );
 });
 
 test("explains the browser OS-bond boundary without claiming first-pair success", () => {
@@ -133,6 +152,7 @@ test("preserves structured Web Bluetooth connection evidence for users and suppo
 });
 
 test("uses the proven Dexcom advertisement and GATT UUIDs", () => {
+  assert.equal(sensorImportBluetoothOptions.connectTimeoutMs, 300_000);
   assert.equal(sensorImportBluetoothOptions.chooserServiceUuid, "0000febc-0000-1000-8000-00805f9b34fb");
   assert.equal(sensorImportBluetoothOptions.serviceUuid, "f8083532-849e-531c-c594-30f1f86a4ea5");
   assert.deepEqual(sensorImportBluetoothOptions.channels, {
