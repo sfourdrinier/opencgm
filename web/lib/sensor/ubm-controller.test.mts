@@ -70,6 +70,59 @@ test("truthfully rejects chooser use outside transient activation", async () => 
   assert.deepEqual(fake.calls, []);
 });
 
+test("opens the chooser before engine loading can consume transient activation", async () => {
+  let activationAvailable = true;
+  let chooseCalls = 0;
+  const fake = fakeManager();
+  const deps: SensorControllerDependencies = {
+    createManager: async () => ({
+      ...fake.manager,
+      choose: async () => {
+        chooseCalls += 1;
+        if (!activationAvailable) throw new Error("activation expired");
+        return { id: "peer" };
+      },
+    }),
+    createEngine: async () => {
+      activationAvailable = false;
+      return { push: async () => [], stop: async () => undefined };
+    },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await controller.importSensor({ sensorName: "sensor", userActivation: true });
+
+  assert.equal(chooseCalls, 1);
+});
+
+test("does not load or leak an engine when chooser cancellation ends the run", async () => {
+  let engineLoads = 0;
+  let managerDestroyed = 0;
+  const deps: SensorControllerDependencies = {
+    createManager: async () => ({
+      choose: async () => { throw new Error("chooser cancelled"); },
+      connect: async () => { throw new Error("connect should not run"); },
+      destroy: async () => { managerDestroyed += 1; },
+    }),
+    createEngine: async () => {
+      engineLoads += 1;
+      return { push: async () => [], stop: async () => undefined };
+    },
+    clock: () => 0,
+    timer: { sleep: async () => undefined },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 1, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  await assert.rejects(controller.importSensor({ sensorName: "sensor", userActivation: true }), /chooser cancelled/);
+
+  assert.equal(engineLoads, 0);
+  assert.equal(managerDestroyed, 1);
+});
+
 test("retries after a failed action while preserving the partial history and cleaning each connection once", async () => {
   const fake = fakeManager();
   let starts = 0;

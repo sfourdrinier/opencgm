@@ -53,6 +53,22 @@ test("recomputes localhost Bluetooth capability after client mount", () => {
   assert.match(browserSupportMessage(capability), /ready/i);
 });
 
+test("gives Linux Chrome an exact adapter, flag, relaunch, and reload recovery", () => {
+  const message = browserSupportMessage({ secureContext: true, bluetooth: false, userAgent: "Mozilla/5.0 (X11; Linux x86_64) Chrome/140.0" });
+  assert.match(message, /hci0/);
+  assert.match(message, /--enable-experimental-web-platform-features/);
+  assert.match(message, /relaunch Chrome/);
+  assert.match(message, /reload this page/);
+});
+
+test("keeps non-Linux Chrome recovery guidance generic", () => {
+  const message = browserSupportMessage({ secureContext: true, bluetooth: false, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140.0" });
+  assert.match(message, /Google Chrome/);
+  assert.doesNotMatch(message, /hci0|enable-experimental-web-platform-features/);
+  const androidMessage = browserSupportMessage({ secureContext: true, bluetooth: false, userAgent: "Mozilla/5.0 (Linux; Android 15) Chrome/140.0" });
+  assert.doesNotMatch(androidMessage, /hci0|enable-experimental-web-platform-features/);
+});
+
 test("summarises counts, duplicate rows, range, cadence, gaps, and completeness", () => {
   const summary = sensorImportCoverage(imported);
   assert.equal(summary.readings, 1);

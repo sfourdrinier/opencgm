@@ -78,13 +78,17 @@ export function browserCapabilitySnapshot(input: {
   return { secureContext: input.secureContext, bluetooth: "bluetooth" in input.navigator, origin: input.origin };
 }
 
-export function browserSupportMessage(input: BrowserCapabilityInput): string {
+export function browserSupportMessage(input: BrowserCapabilityInput & { readonly userAgent?: string }): string {
   const localhost = input.origin !== undefined && /^http:\/\/localhost(?::\d+)?$/u.test(input.origin);
   if (!input.secureContext && !localhost) {
     return "Use Google Chrome with Bluetooth enabled and a Dexcom G7 sensor nearby.";
   }
   if (!input.bluetooth) {
-    return "Use Google Chrome with a Dexcom G7 and Bluetooth enabled. This browser does not report Web Bluetooth support.";
+    const userAgent = input.userAgent ?? "";
+    if (/Linux/u.test(userAgent) && !/Android/u.test(userAgent)) {
+      return "On Linux, confirm a Bluetooth adapter named hci0 is present (for example with bluetoothctl list), fully quit and relaunch Chrome with --enable-experimental-web-platform-features, then reload this page.";
+    }
+    return "Use Google Chrome with a Dexcom G7 and Bluetooth enabled. Fully quit and relaunch Chrome, then reload this page; this browser does not report Web Bluetooth support.";
   }
   return "Browser support is ready. Have your Dexcom G7 nearby with Bluetooth enabled.";
 }
@@ -239,7 +243,7 @@ export function SensorImportClient({
       <section className="border-2 border-accent bg-accent-soft/40 p-6" aria-labelledby="sensor-prerequisites-title">
         <h2 id="sensor-prerequisites-title" className="text-lg font-semibold text-ink">Before you connect</h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-soft">Requires Google Chrome, Bluetooth, and a Dexcom G7 sensor.</p>
-        <p className="mt-3 text-sm text-ink-soft" role="status">{support && capability ? browserSupportMessage(capability) : "Checking browser support…"}</p>
+        <p className="mt-3 text-sm text-ink-soft" role="status">{support && capability ? browserSupportMessage({ ...capability, userAgent: typeof navigator === "undefined" ? undefined : navigator.userAgent }) : "Checking browser support…"}</p>
       </section>
 
       <section className="border border-rule bg-paper-raised p-6" aria-labelledby="sensor-connect-title">

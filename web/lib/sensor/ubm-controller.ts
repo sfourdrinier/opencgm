@@ -175,8 +175,6 @@ export function createSensorController(
 
   async function run(request: SensorImportRequest): Promise<SensorImportResult> {
     manager = await dependencies.createManager();
-    engine = await dependencies.createEngine();
-    if (stopped) throw new Error("sensor controller stopped");
     destroyPromise = null;
     recordsForCurrentRun = [];
     metadataForCurrentRun = null;
@@ -195,6 +193,8 @@ export function createSensorController(
             optionalServices: [...(options.optionalServices ?? [])],
           });
           dependencies.onPeerSelected?.(peer.id);
+          if (stopped) throw new Error("sensor controller stopped");
+          if (engine === null) engine = await dependencies.createEngine();
           if (stopped) throw new Error("sensor controller stopped");
           const rememberedCredential = request.credential === undefined || request.credential === null
             ? await dependencies.loadCredential?.(peer.id) ?? null
