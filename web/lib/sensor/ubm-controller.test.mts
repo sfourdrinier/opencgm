@@ -132,6 +132,39 @@ test("preserves a timed-out pending connection instead of masking it with an uns
   assert.equal(connects, 1);
 });
 
+test("waits before retrying a chooser peer after discovery loses the link", async () => {
+  let connects = 0;
+  const delays: number[] = [];
+  const fake = fakeManager();
+  const manager = {
+    ...fake.manager,
+    connect: async () => {
+      connects += 1;
+      if (connects === 1) {
+        return {
+          discover: async () => { throw { code: "operation.disconnected", operation: "web-gatt.discover-characteristics" }; },
+          disconnect: async () => undefined,
+        };
+      }
+      return fake.manager.connect();
+    },
+  };
+  const deps: SensorControllerDependencies = {
+    createManager: async () => manager,
+    createEngine: async () => ({ push: async (command: EngineCommand) => command.kind === "start" ? [{ kind: "complete", completeness: "complete" }] : [], stop: async () => undefined }),
+    clock: () => 0,
+    timer: { sleep: async delay => { delays.push(delay); } },
+    entropy: () => new Uint8Array(),
+  };
+  const controller = createSensorController(deps, { maxAttempts: 2, retryDelayMs: 7, serviceUuid: "service", channels: { authentication: "auth", control: "control", backfill: "backfill", "extra-data": "extra" } });
+
+  const result = await controller.importSensor({ sensorName: "sensor", userActivation: true });
+
+  assert.equal(result.completeness, "complete");
+  assert.equal(connects, 2);
+  assert.deepEqual(delays, [7]);
+});
+
 test("truthfully rejects chooser use outside transient activation", async () => {
   const fake = fakeManager();
   const deps: SensorControllerDependencies = {

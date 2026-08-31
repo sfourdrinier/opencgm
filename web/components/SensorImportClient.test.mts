@@ -105,6 +105,8 @@ test("explains that a selected sensor is connecting instead of asking for anothe
 
 test("keeps one selected-device connection attempt alive for the sensor wake interval", () => {
   assert.equal(sensorImportBluetoothOptions.connectTimeoutMs, 300_000);
+  assert.equal(sensorImportBluetoothOptions.maxAttempts, 25);
+  assert.equal(sensorImportBluetoothOptions.retryDelayMs, 15_000);
 });
 
 test("describes Chrome NotFoundError without claiming the user cancelled", () => {

@@ -48,6 +48,11 @@ export function sensorImportDiagnosticsVisible(search: string): boolean {
 
 export const sensorImportBluetoothOptions = {
   connectTimeoutMs: 300_000,
+  // A sensor can close the link while it is asleep. Keep the selected peer and
+  // retry across its five-minute availability interval instead of failing after
+  // two immediate discovery attempts.
+  maxAttempts: 25,
+  retryDelayMs: 15_000,
   chooserServiceUuid: "0000febc-0000-1000-8000-00805f9b34fb",
   serviceUuid: "f8083532-849e-531c-c594-30f1f86a4ea5",
   channels: {

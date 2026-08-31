@@ -130,8 +130,11 @@ pnpm run build
 
 If the chooser shows no sensor, another application may have the sensor's radio
 session or the sensor may be out of range/asleep; stop the competing session,
-bring the sensor nearby, and retry. A cancelled chooser, denied permission,
-missing pairing material, or link loss is surfaced as a local retryable state.
+bring the sensor nearby, and retry. After selection, the importer keeps the
+same peer and retries a lost discovery link every 15 seconds for up to 25
+attempts, covering a normal sensor wake interval without reopening the chooser.
+A cancelled chooser, denied permission, missing pairing material, or link loss
+is surfaced as a local retryable state.
 The importer only returns history the sensor makes available. It can therefore
 complete with partial history and warnings; a partial import is not evidence
 that the unavailable interval contained no readings.

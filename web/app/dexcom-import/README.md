@@ -62,10 +62,13 @@ device security boundary.
 
 The sensor becomes available briefly about every five minutes. Keep this page
 open; discovery can take several minutes. A sleeping or unavailable remembered
-sensor remains a waiting state. Stop the competing session, bring the sensor
-nearby, and use Choose another sensor if needed. A cancelled
-chooser, denied permission, missing credential, or lost link can be retried
-locally; the page does not bypass the browser's Bluetooth permission model.
+sensor remains a waiting state. After a chooser selection, the page keeps that
+same peer and retries a lost discovery link every 15 seconds for up to 25
+attempts, so a brief sensor wake window does not require opening the chooser
+again. Stop the competing session, bring the sensor nearby, and use Choose
+another sensor if needed. A cancelled chooser, denied permission, missing
+credential, or lost link can be retried locally; the page does not bypass the
+browser's Bluetooth permission model.
 
 Chrome cannot complete a new operating-system Bluetooth bond through this page.
 The first pairing can still reach the sensor protocol's pairing step, but a

@@ -104,6 +104,8 @@ export type SensorControllerOptions = {
   readonly channels: Readonly<Record<SensorChannel, string>>;
   readonly optionalServices?: readonly string[];
   readonly maxAttempts?: number;
+  /** Delay between chooser reconnect attempts. Authorized reconnects use their dedicated delay. */
+  readonly retryDelayMs?: number;
   readonly authorizedRetryDelayMs?: number;
   readonly authorizedRetryAttempts?: number;
   readonly connectTimeoutMs?: number;
@@ -221,7 +223,8 @@ export function createSensorController(
     const maxAttempts = request.selection === "authorized"
       ? Math.max(1, options.authorizedRetryAttempts ?? DEFAULT_AUTHORIZED_RETRY_ATTEMPTS)
       : Math.max(1, options.maxAttempts ?? 2);
-    const retryDelayMs = Math.max(0, options.authorizedRetryDelayMs ?? DEFAULT_AUTHORIZED_RETRY_DELAY_MS);
+    const authorizedRetryDelayMs = Math.max(0, options.authorizedRetryDelayMs ?? DEFAULT_AUTHORIZED_RETRY_DELAY_MS);
+    const chooserRetryDelayMs = Math.max(0, options.retryDelayMs ?? 0);
     const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
     credentialPersistenceFailedForCurrentRun = false;
     readingPersistenceFailedForCurrentRun = false;
@@ -246,8 +249,8 @@ export function createSensorController(
         activeTerminal = terminal;
         const generation = { value: attempt };
         try {
-          if (request.selection === "authorized" && attempt > 1) {
-            await dependencies.timer.sleep(retryDelayMs);
+          if (attempt > 1) {
+            await dependencies.timer.sleep(request.selection === "authorized" ? authorizedRetryDelayMs : chooserRetryDelayMs);
             if (stopped) throw new Error("sensor controller stopped");
           }
           connection = await manager!.connect(peer, { timeoutMs: connectTimeoutMs });
