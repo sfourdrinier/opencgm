@@ -14,6 +14,7 @@ import {
   sensorImportDiagnosticsVisible,
   sensorImportCoverage,
   sensorImportWaitingCopy,
+  sensorSelectedCopy,
   sensorImportError,
 } from "./SensorImportClient";
 
@@ -91,6 +92,10 @@ test("uses truthful waiting copy for intermittent sensor availability", () => {
   assert.match(sensorImportWaitingCopy, /keep this page open/i);
   assert.match(sensorImportWaitingCopy, /several minutes/);
   assert.doesNotMatch(sensorImportWaitingCopy, /exactly|seconds|window/);
+});
+
+test("explains that a selected sensor is connecting instead of asking for another prompt", () => {
+  assert.equal(sensorSelectedCopy, "Sensor selected. Connecting, authenticating, and reading available history…");
 });
 
 test("explains the browser OS-bond boundary without claiming first-pair success", () => {

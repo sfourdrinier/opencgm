@@ -36,6 +36,7 @@ export const privacyCopy = "Your data stays in this browser. Sensor readings and
 export const pairingCodeGuidance = "Enter the four ASCII digits from the sensor applicator or pairing material.";
 export const pairingCodeRequiredCopy = "— Need pairing code";
 export const sensorImportWaitingCopy = "A sensor may become available briefly about every five minutes. Keep this page open; discovery can take several minutes. A sleeping or unavailable remembered sensor remains in a waiting state.";
+export const sensorSelectedCopy = "Sensor selected. Connecting, authenticating, and reading available history…";
 
 export function isValidPairingCode(value: string): boolean {
   return /^[0-9]{4}$/u.test(value);
@@ -221,6 +222,7 @@ export function SensorImportClient({
       const archive = archiveRef.current;
       const credentials = sensorImportCredentialCallbacks(vault, remember, (peerId) => {
         selectedPeerIdRef.current = peerId;
+        setProgress(sensorSelectedCopy);
         if (selection === "authorized") setAuthorizedPeerFound(true);
       }, archive ? reading => archive.save(reading) : undefined);
       const existingReadings = archive ? await archive.list() : [];
@@ -327,7 +329,7 @@ export function SensorImportClient({
         <p id="pairing-code-guidance" className="mt-2 text-xs text-ink-faint">{pairingCodeGuidance}</p>
         <label className="mt-4 flex items-center gap-2 text-sm text-ink-soft"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Remember this sensor on this browser</label>
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => void connect()} disabled={support?.state !== "supported" || busy || !isValidPairingCode(pairingCode)} className="bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-ink disabled:cursor-not-allowed disabled:opacity-50">{busy ? progress || "Working…" : authorizedPeerFound ? "Choose another sensor" : stage === "error" ? "Retry connection" : "Connect Dexcom G7"}</button>
+          <button type="button" onClick={() => void connect()} disabled={support?.state !== "supported" || busy || !isValidPairingCode(pairingCode)} className="bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-ink disabled:cursor-not-allowed disabled:opacity-50">{stage === "analysis" ? "Analyzing…" : busy ? "Connecting…" : authorizedPeerFound ? "Choose another sensor" : stage === "error" ? "Retry connection" : "Connect Dexcom G7"}</button>
           {!busy && !isValidPairingCode(pairingCode) ? <span className="text-sm font-semibold text-low" role="status">{pairingCodeRequiredCopy}</span> : null}
           {busy ? <button type="button" onClick={() => { cancelledRef.current = true; void stop(); setStage("cancelled"); setProgress(importProgressLabel("cancelled")); }} className="border border-rule-strong px-4 py-2.5 text-sm text-ink-soft hover:border-accent hover:text-accent">Cancel</button> : null}
           {stage === "done" || result ? <button type="button" onClick={() => void disconnect()} className="border border-rule-strong px-4 py-2.5 text-sm text-ink-soft hover:border-accent hover:text-accent">Disconnect</button> : null}
