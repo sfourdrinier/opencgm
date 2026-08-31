@@ -170,8 +170,11 @@ def test_cgm_parser_all_subjects_have_overlap():
         # Lazily extract only if not already present.
         import zipfile
 
+        archive = Path(data_zip) / "Data.zip"
+        if not archive.is_file():
+            pytest.skip("PPG raw dataset not available; set PPG_DATA_ZIP to run this test")
         work.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(Path(data_zip) / "Data.zip") as z:
+        with zipfile.ZipFile(archive) as z:
             z.extractall(work)
     subjects = list_subjects(work)
     assert subjects == ["P001", "P002", "P003", "P004", "P005"]
