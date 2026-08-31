@@ -192,7 +192,7 @@ export function SensorImportClient({
   createVault = defaultCreateVault,
   createArchive = defaultCreateArchive,
 }: SensorImportClientProps = {}) {
-  const diagnosticsVisible = typeof window !== "undefined" && sensorImportDiagnosticsVisible(window.location.search);
+  const [diagnosticsVisible, setDiagnosticsVisible] = useState(false);
   const [capability, setCapability] = useState<BrowserCapabilityInput | null>(null);
   const support = capability ? getWebSensorSupport(capability) : null;
   const [stage, setStage] = useState<ImportStage>("idle");
@@ -219,7 +219,10 @@ export function SensorImportClient({
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setCapability(initialBrowserCapability()));
+    const frame = window.requestAnimationFrame(() => {
+      setCapability(initialBrowserCapability());
+      setDiagnosticsVisible(sensorImportDiagnosticsVisible(window.location.search));
+    });
     return () => window.cancelAnimationFrame(frame);
   }, []);
 

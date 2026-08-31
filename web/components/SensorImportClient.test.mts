@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { BleError } from "unified-ble-manager";
 import type { SensorImportResult } from "../lib/sensor/contracts";
 import {
@@ -18,6 +20,7 @@ import {
   sensorSelectedCopy,
   sensorImportError,
   sensorImportDiagnostic,
+  SensorImportClient,
 } from "./SensorImportClient";
 
 const imported: SensorImportResult = {
@@ -168,6 +171,24 @@ test("reveals diagnostic credential inputs only for the exact debug query", () =
   assert.equal(sensorImportDiagnosticsVisible("?debug=yesplease"), true);
   assert.equal(sensorImportDiagnosticsVisible("?debug=yespleasex"), false);
   assert.equal(sensorImportDiagnosticsVisible("?x=1&debug=yesplease"), false);
+});
+
+test("keeps the first debug render identical to server HTML", () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Reflect.deleteProperty(globalThis, "window");
+  const serverHtml = renderToStaticMarkup(createElement(SensorImportClient));
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { location: { search: "?debug=yesplease" } },
+  });
+  try {
+    const firstBrowserHtml = renderToStaticMarkup(createElement(SensorImportClient));
+    assert.equal(firstBrowserHtml, serverHtml);
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, "window", descriptor);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
 });
 
 test("uses the exact prominent local-processing privacy copy", () => {
