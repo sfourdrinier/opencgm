@@ -101,12 +101,28 @@ export default function Home() {
               , and a research studio app for that work is next.
             </p>
           </div>
-          <p className="mt-4 text-sm text-ink-faint">
-            <a href={LINKS.author} className="font-medium text-ink-soft hover:text-accent">
-              Stephane Fourdrinier
-            </a>{" "}
-            &mdash; independent researcher
-          </p>
+          <div className="mt-4 space-y-0.5 text-sm text-ink-faint">
+            <p>
+              <a href={LINKS.author} className="font-medium text-ink-soft hover:text-accent">
+                Stephane Fourdrinier
+              </a>{" "}
+              &mdash; independent researcher
+            </p>
+            <p>
+              Founder,{" "}
+              <a
+                href={LINKS.company}
+                className="text-ink-soft hover:text-accent"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Track Our Hearts
+                {/* aria-hidden: the arrow marks the new tab visually; screen readers get the
+                    same fact from the link text and the browser's own announcement. */}
+                <span aria-hidden="true"> &#8599;</span>
+              </a>
+            </p>
+          </div>
         </div>
       </section>
 

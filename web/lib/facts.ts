@@ -120,6 +120,7 @@ export const LINKS = {
   comparator: "https://github.com/cruiseresearchgroup/CGM-JEPA",
   repo: "https://github.com/sfourdrinier/opencgm",
   author: "https://www.linkedin.com/in/stephanefourdrinier",
+  company: "https://trackourhearts.com",
   // Narrated 75s explainer. Served from the generator's CDN rather than committed to the
   // repo: it is 4.8 MB, and Vercel would otherwise ship it in every deployment bundle.
   explainer:
