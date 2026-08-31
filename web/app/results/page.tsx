@@ -2,7 +2,6 @@ import { Callout, Reproduce, ScoreAxis, ScoreBar } from "@/components/Figures";
 import {
   ABLATION_SD,
   ABLATIONS,
-  AMBIGUITY,
   ARTIFACT,
   CORPUS,
   LINKS,
@@ -227,9 +226,6 @@ export default function Results() {
           </a>
           <a href={LINKS.ablations} className="text-accent hover:underline">
             findings/tier1_ablations.md — the full ablation matrix →
-          </a>
-          <a href={LINKS.decisions} className="text-accent hover:underline">
-            DECISIONS.md — {AMBIGUITY.decisionEntries} dated decisions →
           </a>
           <a href={LINKS.reproduce} className="text-accent hover:underline">
             REPRODUCE.md — measured wall-clocks, copy-paste commands →

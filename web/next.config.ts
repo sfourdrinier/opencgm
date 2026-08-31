@@ -60,11 +60,16 @@ const config: NextConfig = {
   async headers() {
     const scriptSources = ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"];
     if (process.env.NODE_ENV === "development") scriptSources.push("'unsafe-eval'");
+    // The explainer video is served from the generator's CDN rather than committed here, so
+    // media needs its own source list. Everything else stays same-origin: this widens media
+    // only, not the `default-src` fallback that would have carried scripts and frames with it.
+    const mediaSources = ["'self'", "https://assets.imagibooks.com"];
     const contentSecurityPolicy = [
       "default-src 'self'",
       `script-src ${scriptSources.join(" ")}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
+      `media-src ${mediaSources.join(" ")}`,
       "font-src 'self'",
       "connect-src 'self'",
       "worker-src 'self' blob:",

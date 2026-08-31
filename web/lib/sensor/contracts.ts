@@ -32,6 +32,7 @@ export type SensorImportMetadata = {
   readonly newestAtMs: number | null;
   readonly readingCount: number;
   readonly duplicateCount: number;
+  readonly historyCompletedThroughSeconds: number | null;
 };
 
 export type SensorImportResult = {
@@ -43,7 +44,7 @@ export type SensorImportResult = {
 };
 
 export type EngineCommand =
-  | { readonly kind: "start"; readonly nowMs: number; readonly sensorName: string; readonly credential: Uint8Array | null; readonly pairingCode: string | null; readonly certificateBundle: Uint8Array | null }
+  | { readonly kind: "start"; readonly nowMs: number; readonly sensorName: string; readonly credential: Uint8Array | null; readonly pairingCode: string | null; readonly certificateBundle: Uint8Array | null; readonly historyStartSeconds?: number | null }
   | { readonly kind: "frame"; readonly channel: SensorChannel; readonly bytes: Uint8Array; readonly nowMs: number }
   | { readonly kind: "action-result"; readonly actionId: number; readonly ok: boolean; readonly bytes: Uint8Array }
   | { readonly kind: "terminal"; readonly reason: TerminalReason }
@@ -133,6 +134,7 @@ class Writer {
   public optionalBytes(value: Uint8Array | null): void { this.u8(value === null ? 0 : 1); if (value !== null) this.bytesValue(value); }
   public optionalString(value: string | null): void { this.u8(value === null ? 0 : 1); if (value !== null) this.string(value); }
   public optionalU64(value: number | null): void { this.u8(value === null ? 0 : 1); if (value !== null) this.u64(value); }
+  public optionalU32(value: number | null): void { this.u8(value === null ? 0 : 1); if (value !== null) this.u32(value); }
   public finish(): Uint8Array {
     if (this.bytes.length > ENGINE_ABI_MAX_BYTES) throw new EngineAbiError("Payload is too large");
     return Uint8Array.from(this.bytes);
@@ -171,6 +173,8 @@ class Reader {
   public optionalBytes(): Uint8Array | null { const present = this.u8(); if (present === 0) return null; if (present !== 1) throw new EngineAbiError("Invalid optional value tag"); return this.bytesValue(); }
   public optionalString(): string | null { const present = this.u8(); if (present === 0) return null; if (present !== 1) throw new EngineAbiError("Invalid optional value tag"); return this.string(); }
   public optionalU64(): number | null { const present = this.u8(); if (present === 0) return null; if (present !== 1) throw new EngineAbiError("Invalid optional value tag"); return this.u64(); }
+  public optionalU32(): number | null { const present = this.u8(); if (present === 0) return null; if (present !== 1) throw new EngineAbiError("Invalid optional value tag"); return this.u32(); }
+  public hasRemaining(): boolean { return this.offset < this.bytes.length; }
   public done(): void { if (this.offset !== this.bytes.length) throw new EngineAbiError("Trailing bytes"); }
   private fail(message: string): never { throw new EngineAbiError(message); }
 }
@@ -192,17 +196,17 @@ function readReading(reader: Reader): ImportedSensorReading {
 
 function writeMetadata(writer: Writer, metadata: SensorImportMetadata): void {
   writer.string(metadata.sensorId); writer.optionalU64(metadata.activatedAtMs); writer.optionalString(metadata.firmware);
-  writer.optionalU64(metadata.oldestAtMs); writer.optionalU64(metadata.newestAtMs); writer.u32(metadata.readingCount); writer.u32(metadata.duplicateCount);
+  writer.optionalU64(metadata.oldestAtMs); writer.optionalU64(metadata.newestAtMs); writer.u32(metadata.readingCount); writer.u32(metadata.duplicateCount); writer.optionalU32(metadata.historyCompletedThroughSeconds);
 }
 function readMetadata(reader: Reader): SensorImportMetadata {
-  return { sensorId: reader.string(), activatedAtMs: reader.optionalU64(), firmware: reader.optionalString(), oldestAtMs: reader.optionalU64(), newestAtMs: reader.optionalU64(), readingCount: reader.u32(), duplicateCount: reader.u32() };
+  return { sensorId: reader.string(), activatedAtMs: reader.optionalU64(), firmware: reader.optionalString(), oldestAtMs: reader.optionalU64(), newestAtMs: reader.optionalU64(), readingCount: reader.u32(), duplicateCount: reader.u32(), historyCompletedThroughSeconds: reader.hasRemaining() ? reader.optionalU32() : null };
 }
 function finishDecode<T>(reader: Reader, value: T): T { reader.done(); return value; }
 
 export function encodeEngineCommand(command: EngineCommand): Uint8Array {
   const writer = new Writer(); writer.u8(ENGINE_ABI_VERSION);
   switch (command.kind) {
-    case "start": writer.u8(0); writer.u64(command.nowMs); writer.string(command.sensorName); writer.optionalBytes(command.credential); writer.optionalString(command.pairingCode); writer.optionalBytes(command.certificateBundle); break;
+    case "start": writer.u8(0); writer.u64(command.nowMs); writer.string(command.sensorName); writer.optionalBytes(command.credential); writer.optionalString(command.pairingCode); writer.optionalBytes(command.certificateBundle); writer.optionalU32(command.historyStartSeconds ?? null); break;
     case "frame": writer.u8(1); writer.u8(enumCode(channels, command.channel, "channel")); writer.bytesValue(command.bytes); writer.u64(command.nowMs); break;
     case "action-result": writer.u8(2); writer.u32(command.actionId); writer.u8(command.ok ? 1 : 0); writer.bytesValue(command.bytes); break;
     case "terminal": writer.u8(3); writer.u8(enumCode(terminalReasons, command.reason, "terminal reason")); break;
@@ -214,7 +218,11 @@ export function encodeEngineCommand(command: EngineCommand): Uint8Array {
 export function decodeEngineCommand(bytes: Uint8Array): EngineCommand {
   const reader = new Reader(bytes); if (reader.u8() !== ENGINE_ABI_VERSION) throw new EngineAbiError("Unsupported ABI version");
   switch (reader.u8()) {
-    case 0: return finishDecode(reader, { kind: "start", nowMs: reader.u64(), sensorName: reader.string(), credential: reader.optionalBytes(), pairingCode: reader.optionalString(), certificateBundle: reader.optionalBytes() });
+    case 0: {
+      const nowMs = reader.u64(); const sensorName = reader.string(); const credential = reader.optionalBytes(); const pairingCode = reader.optionalString(); const certificateBundle = reader.optionalBytes();
+      const historyStartSeconds = reader.hasRemaining() ? reader.optionalU32() : null;
+      return finishDecode(reader, { kind: "start", nowMs, sensorName, credential, pairingCode, certificateBundle, historyStartSeconds });
+    }
     case 1: return finishDecode(reader, { kind: "frame", channel: enumValue(channels, reader.u8(), "channel"), bytes: reader.bytesValue(), nowMs: reader.u64() });
     case 2: { const actionId = reader.u32(); const okTag = reader.u8(); if (okTag !== 0 && okTag !== 1) throw new EngineAbiError("Invalid action result flag"); return finishDecode(reader, { kind: "action-result", actionId, ok: okTag === 1, bytes: reader.bytesValue() }); }
     case 3: return finishDecode(reader, { kind: "terminal", reason: enumValue(terminalReasons, reader.u8(), "terminal reason") });

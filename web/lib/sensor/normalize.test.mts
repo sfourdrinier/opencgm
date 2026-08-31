@@ -11,6 +11,7 @@ const metadata: SensorImportMetadata = {
   newestAtMs: 3_000,
   readingCount: 3,
   duplicateCount: 0,
+  historyCompletedThroughSeconds: null,
 };
 
 test("retains every provenance record while mapping only finite reliable readings", () => {

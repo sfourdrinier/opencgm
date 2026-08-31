@@ -61,7 +61,9 @@ test("keeps the production ABI 1 asset revalidated and serves it under a first-p
   assert.match(config, /script-src \$\{scriptSources\.join\(" "\)\}/);
   assert.match(config, /"'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"/);
   assert.match(config, /"connect-src 'self'"/);
-  assert.doesNotMatch(config, /https?:\/\/(?!opencgm\.vercel\.app|localhost)/);
+  // External media may be allowlisted independently; executable code and sensor I/O stay same-origin.
+  assert.doesNotMatch(config, /const scriptSources = \[[^\]]*https?:\/\//);
+  assert.doesNotMatch(config, /connect-src[^"\n]*https?:\/\//);
   assert.doesNotMatch(config, /relay|private|third-party/i);
 });
 

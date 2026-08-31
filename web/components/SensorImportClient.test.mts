@@ -39,6 +39,7 @@ const imported: SensorImportResult = {
     newestAtMs: Date.UTC(2026, 7, 28, 8),
     readingCount: 1,
     duplicateCount: 2,
+    historyCompletedThroughSeconds: null,
   },
   completeness: "partial",
   warnings: ["History is partial."],
@@ -151,15 +152,23 @@ test("wires vault callbacks to the selected peer and keeps saving opt-in", async
     load: async (peerId: string) => { loads.push(peerId); return new Uint8Array([4]); },
     save: async (peerId: string, credential: Uint8Array) => { saves.push({ peerId, credential }); },
   };
-  const callbacks = sensorImportCredentialCallbacks(vault, true, peerId => selected.push(peerId));
+  const persistedReadings: string[] = [];
+  const callbacks = sensorImportCredentialCallbacks(
+    vault,
+    true,
+    peerId => selected.push(peerId),
+    reading => { persistedReadings.push(`${reading.sensorId}:${reading.sensorSeconds}`); },
+  );
 
   callbacks.onPeerSelected?.("stable-peer");
   const loaded = await callbacks.loadCredential?.("stable-peer");
   await callbacks.saveCredential?.("stable-peer", new Uint8Array([5]));
+  await callbacks.onReading?.(imported.records[0]!);
 
   assert.deepEqual(selected, ["stable-peer"]);
   assert.deepEqual(loads, ["stable-peer"]);
   assert.deepEqual(loaded, new Uint8Array([4]));
   assert.deepEqual(saves, [{ peerId: "stable-peer", credential: new Uint8Array([5]) }]);
+  assert.deepEqual(persistedReadings, ["g7-demo:10"]);
   assert.equal(sensorImportCredentialCallbacks(vault, false, () => undefined).saveCredential, undefined);
 });

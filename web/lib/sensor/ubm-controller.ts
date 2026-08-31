@@ -89,7 +89,7 @@ export type SensorControllerDependencies = {
   readonly entropy: (byteCount: number) => Uint8Array;
 };
 
-export type SensorCredentialCallbacks = Pick<SensorControllerDependencies, "loadCredential" | "saveCredential" | "onPeerSelected">;
+export type SensorCredentialCallbacks = Pick<SensorControllerDependencies, "loadCredential" | "saveCredential" | "onPeerSelected" | "onReading">;
 
 export type SensorControllerOptions = {
   readonly serviceUuid: string;
@@ -108,6 +108,7 @@ export type SensorImportRequest = {
   readonly pairingCode?: string | null;
   readonly certificateBundle?: Uint8Array | null;
   readonly selection?: "chooser" | "authorized";
+  readonly historyStartSeconds?: number | null;
 };
 export type SensorController = {
   readonly importSensor: (request: SensorImportRequest) => Promise<SensorImportResult>;
@@ -255,6 +256,7 @@ export function createSensorController(
             credential: request.credential ?? credential,
             pairingCode: request.selection === "authorized" ? null : request.pairingCode ?? null,
             certificateBundle: request.certificateBundle ?? null,
+            historyStartSeconds: request.historyStartSeconds ?? null,
           });
           await processActions(startActions, database, attemptEngine, generation, terminal, generation.value, peer.id);
           if (terminal.waiting && !terminal.settled) {
@@ -450,7 +452,7 @@ export function createSensorController(
     const sensorId = existing?.sensorId ?? request.sensorId ?? records[0]?.sensorId ?? request.sensorName;
     const timestamps = records.map(record => record.atMs).filter(Number.isFinite);
     return existing === null || existing === undefined
-      ? { sensorId, activatedAtMs: null, firmware: null, oldestAtMs: timestamps.length ? Math.min(...timestamps) : null, newestAtMs: timestamps.length ? Math.max(...timestamps) : null, readingCount: records.length, duplicateCount: 0 }
+      ? { sensorId, activatedAtMs: null, firmware: null, oldestAtMs: timestamps.length ? Math.min(...timestamps) : null, newestAtMs: timestamps.length ? Math.max(...timestamps) : null, readingCount: records.length, duplicateCount: 0, historyCompletedThroughSeconds: null }
       : { ...existing, readingCount: records.length, oldestAtMs: timestamps.length ? Math.min(...timestamps) : existing.oldestAtMs, newestAtMs: timestamps.length ? Math.max(...timestamps) : existing.newestAtMs };
   }
 

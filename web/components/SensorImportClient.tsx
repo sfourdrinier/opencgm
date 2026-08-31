@@ -11,7 +11,8 @@ import {
   type SensorCredentialCallbacks,
 } from "@/lib/sensor/ubm-controller";
 import { CredentialVault } from "@/lib/sensor/credential-vault";
-import type { SensorImportResult } from "@/lib/sensor/contracts";
+import { createReadingArchive, type ReadingArchive } from "@/lib/sensor/reading-archive";
+import type { ImportedSensorReading, SensorImportResult } from "@/lib/sensor/contracts";
 import { SensorImportCoverage, sensorImportCoverage } from "@/components/SensorImportCoverage";
 import { SensorImportTimeline } from "@/components/SensorImportTimeline";
 
@@ -26,6 +27,7 @@ export type BrowserCapabilityInput = {
 export type SensorImportClientProps = {
   readonly createController?: (credentials?: SensorCredentialCallbacks) => SensorController | Promise<SensorController>;
   readonly createVault?: () => Promise<CredentialVault>;
+  readonly createArchive?: () => Promise<ReadingArchive>;
 };
 
 type ImportStage = "idle" | "connecting" | "backfill" | "analysis" | "done" | "error" | "cancelled";
@@ -56,16 +58,19 @@ export const sensorImportBluetoothOptions = {
 
 const defaultCreateController = (credentials?: SensorCredentialCallbacks) => createDefaultSensorController(sensorImportBluetoothOptions, credentials);
 const defaultCreateVault = () => CredentialVault.createPersistentAsync();
+const defaultCreateArchive = () => createReadingArchive();
 
 export function sensorImportCredentialCallbacks(
   vault: Pick<CredentialVault, "load" | "save"> | null,
   remember: boolean,
   onPeerSelected: (peerId: string) => void,
+  onReading?: (reading: ImportedSensorReading) => Promise<void> | void,
 ): SensorCredentialCallbacks {
   return {
     loadCredential: vault ? (peerId) => vault.load(peerId) : undefined,
     saveCredential: remember && vault ? (peerId, credential) => vault.save(peerId, credential) : undefined,
     onPeerSelected,
+    onReading,
   };
 }
 
@@ -137,6 +142,7 @@ function download(name: string, body: string, type: string): void {
 export function SensorImportClient({
   createController = defaultCreateController,
   createVault = defaultCreateVault,
+  createArchive = defaultCreateArchive,
 }: SensorImportClientProps = {}) {
   const diagnosticsVisible = typeof window !== "undefined" && sensorImportDiagnosticsVisible(window.location.search);
   const [capability, setCapability] = useState<BrowserCapabilityInput | null>(null);
@@ -145,6 +151,8 @@ export function SensorImportClient({
   const [sensorName, setSensorName] = useState("Dexcom G7");
   const [pairingCode, setPairingCode] = useState("");
   const [vaultReady, setVaultReady] = useState(false);
+  const [archiveReady, setArchiveReady] = useState(false);
+  const [archivedReadings, setArchivedReadings] = useState<ImportedSensorReading[]>([]);
   const [authorizedPeerFound, setAuthorizedPeerFound] = useState(false);
   const [remember, setRemember] = useState(false);
   const [result, setResult] = useState<SensorImportResult | null>(null);
@@ -153,6 +161,7 @@ export function SensorImportClient({
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<SensorController | null>(null);
   const vaultRef = useRef<CredentialVault | null>(null);
+  const archiveRef = useRef<ReadingArchive | null>(null);
   const credentialRef = useRef<Uint8Array | null>(null);
   const certificateRef = useRef<Uint8Array | null>(null);
   const selectedPeerIdRef = useRef<string | null>(null);
@@ -173,13 +182,21 @@ export function SensorImportClient({
         setVaultReady(true);
       }
     }).catch(() => { if (mountedRef.current) setVaultReady(true); });
+    void createArchive().then(async (archive) => {
+      const readings = await archive.list();
+      if (mountedRef.current) {
+        archiveRef.current = archive;
+        setArchivedReadings(readings);
+        setArchiveReady(true);
+      }
+    }).catch(() => { if (mountedRef.current) setArchiveReady(true); });
     return () => {
       mountedRef.current = false;
       const controller = controllerRef.current;
       controllerRef.current = null;
       if (controller) void controller.stop();
     };
-  }, [createVault]);
+  }, [createArchive, createVault]);
 
   const stop = useCallback(async () => {
     const controller = controllerRef.current;
@@ -201,10 +218,14 @@ export function SensorImportClient({
     setStage("connecting");
     try {
       const vault = vaultRef.current;
+      const archive = archiveRef.current;
       const credentials = sensorImportCredentialCallbacks(vault, remember, (peerId) => {
         selectedPeerIdRef.current = peerId;
         if (selection === "authorized") setAuthorizedPeerFound(true);
-      });
+      }, archive ? reading => archive.save(reading) : undefined);
+      const existingReadings = archive ? await archive.list() : [];
+      const backfillSeconds = existingReadings.filter(reading => reading.source === "backfill").map(reading => reading.sensorSeconds);
+      const historyStartSeconds = backfillSeconds.length > 0 ? Math.max(...backfillSeconds) : null;
       const created = createController(credentials);
       const controller = created instanceof Promise ? await created : created;
       controllerRef.current = controller;
@@ -215,8 +236,13 @@ export function SensorImportClient({
         pairingCode: selection === "authorized" ? null : pairingCode,
         certificateBundle: certificateRef.current,
         selection,
+        historyStartSeconds,
       });
       if (!mountedRef.current || cancelledRef.current) return;
+      if (archive) {
+        await archive.ingest(imported.records);
+        if (mountedRef.current) setArchivedReadings(await archive.list());
+      }
       setResult(imported);
       setStage("analysis");
       setProgress(importProgressLabel("analysis"));
@@ -231,6 +257,8 @@ export function SensorImportClient({
         setProgress(importProgressLabel("done"));
       }
     } catch (caught) {
+      const archive = archiveRef.current;
+      if (archive && mountedRef.current) setArchivedReadings(await archive.list());
       if (selection === "authorized") {
         if (mountedRef.current && !cancelledRef.current) {
           setStage("idle");
@@ -246,10 +274,10 @@ export function SensorImportClient({
   }, [createController, pairingCode, remember, stage, support, sensorName]);
 
   useEffect(() => {
-    if (!vaultReady || support?.state !== "supported" || stage !== "idle" || autoReconnectStartedRef.current) return;
+    if (!vaultReady || !archiveReady || support?.state !== "supported" || stage !== "idle" || autoReconnectStartedRef.current) return;
     autoReconnectStartedRef.current = true;
     void connect("authorized");
-  }, [connect, stage, support, vaultReady]);
+  }, [archiveReady, connect, stage, support, vaultReady]);
 
   const disconnect = useCallback(async () => {
     await stop();
@@ -270,7 +298,8 @@ export function SensorImportClient({
 
   const busy = stage === "connecting" || stage === "backfill" || stage === "analysis";
   const coverage = result ? sensorImportCoverage(result) : null;
-  const exportName = result?.metadata.sensorId || "sensor-import";
+  const exportName = archivedReadings.at(-1)?.sensorId || result?.metadata.sensorId || "sensor-import";
+  const latestArchived = [...archivedReadings].reverse().find(reading => reading.reliable && reading.mgdl !== null) ?? archivedReadings.at(-1);
 
   return (
     <div className="mt-8 space-y-6">
@@ -309,14 +338,15 @@ export function SensorImportClient({
       </section>
 
       {coverage && result ? <SensorImportCoverage summary={coverage} /> : null}
-      {result ? <SensorImportTimeline records={result.records} /> : null}
+      {archivedReadings.length > 0 ? <SensorImportTimeline records={archivedReadings} /> : result ? <SensorImportTimeline records={result.records} /> : null}
 
-      {result ? (
+      {archivedReadings.length > 0 ? (
         <section className="border border-rule bg-paper-raised p-5" aria-labelledby="sensor-export-title">
-          <div className="flex flex-wrap items-baseline justify-between gap-3"><h2 id="sensor-export-title" className="text-lg font-semibold text-ink">Keep a local copy</h2><span className="text-xs text-ink-faint">Downloads stay in your browser.</span></div>
+          <div className="flex flex-wrap items-baseline justify-between gap-3"><h2 id="sensor-export-title" className="text-lg font-semibold text-ink">Saved in this browser</h2><span className="text-xs text-ink-faint">{archivedReadings.length} readings · downloads stay local.</span></div>
+          {latestArchived ? <p className="mt-3 text-sm text-ink-soft">Latest saved value: <strong className="text-ink">{latestArchived.mgdl ?? "—"} mg/dL</strong> · {new Date(latestArchived.atMs).toLocaleString()}</p> : null}
           <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" onClick={() => download(`${exportName}-readings.csv`, exportReadingsCsv(result.records), "text/csv") } className="border border-rule-strong px-4 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent">Download CSV</button>
-            <button type="button" onClick={() => download(`${exportName}-readings.ndjson`, exportReadingsNdjson(result.records, { ...result.metadata, completeness: result.completeness, warnings: result.warnings }), "application/x-ndjson") } className="border border-rule-strong px-4 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent">Download NDJSON</button>
+            <button type="button" onClick={() => download(`${exportName}-readings.csv`, exportReadingsCsv(archivedReadings), "text/csv") } className="border border-rule-strong px-4 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent">Download CSV</button>
+            <button type="button" onClick={() => download(`${exportName}-readings.ndjson`, exportReadingsNdjson(archivedReadings, { sensorId: exportName, readingCount: archivedReadings.length, completeness: result?.completeness ?? "partial", warnings: result?.warnings ?? [] }), "application/x-ndjson") } className="border border-rule-strong px-4 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent">Download NDJSON</button>
           </div>
         </section>
       ) : null}
