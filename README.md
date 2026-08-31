@@ -55,7 +55,7 @@ their numbers, this project aims to contribute what the paper leaves open:
 | `bundle/` | frozen blueprint + reference config, and the amendments delta |
 | `manifests/sources/registry.yaml` | every source, its lane, rights, and paper target |
 | `src/opencgm_stateevent/` | the implementation |
-| `DECISIONS.md` | every inferred choice, with rationale, written when made |
+| `DECISIONS.md` | every inferred choice, with its rationale and the alternatives |
 
 Raw data lives outside the repo and is never committed.
 

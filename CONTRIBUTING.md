@@ -31,11 +31,10 @@ contribution is taken under the same license unless you explicitly mark it other
 
 ## Release process
 
-1. Record any consequential choice in `DECISIONS.md`, dated, with the alternatives.
+1. Record any consequential choice in `DECISIONS.md`, with the alternatives.
 2. Bump `version` in `pyproject.toml` if the change is user-visible.
 3. Run `just gate` and `just status`. Commit.
-4. Tag with the date: `git tag -a 2026-MM-DD -m "..."` (this project's session-tag
-   convention).
+4. Tag the release: `git tag -a vMAJOR.MINOR.PATCH -m "..."`.
 5. Push. The CI workflow in `.github/workflows/ci.yml` runs lint + tests on every push.
 
 ## Reporting a security issue
